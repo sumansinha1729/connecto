@@ -1,0 +1,42 @@
+import { model, Schema, type HydratedDocument, type InferSchemaType } from 'mongoose';
+
+import { GENDERS } from '../../config/options';
+
+const userSchema = new Schema(
+  {
+    /** E.164 format, e.g. +919876543210 */
+    phone: { type: String, required: true, unique: true },
+    name: { type: String, default: '', trim: true },
+    gender: { type: String, enum: GENDERS, default: null },
+    age: { type: Number, default: null },
+    bio: { type: String, default: '' },
+    languages: { type: [String], default: [] },
+    interests: { type: [String], default: [] },
+    /** "<style>:<seed>", rendered by DiceBear on the client */
+    avatar: { type: String, required: true },
+    role: { type: String, enum: ['user', 'listener'], default: 'user' },
+    isAdmin: { type: Boolean, default: false },
+    /** Listener is accepting calls right now (always false for regular users) */
+    isAvailable: { type: Boolean, default: false },
+    isOnline: { type: Boolean, default: false },
+    lastSeenAt: { type: Date, default: null },
+    rating: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
+    totalCalls: { type: Number, default: 0 },
+    /** Kept in sync on save; only complete profiles are shown to others */
+    profileComplete: { type: Boolean, default: false },
+    status: { type: String, enum: ['active', 'banned', 'deleted'], default: 'active' },
+  },
+  { timestamps: true },
+);
+
+userSchema.pre('save', function () {
+  this.profileComplete = Boolean(this.name && this.gender && this.age && this.languages.length > 0);
+  if (this.role === 'user') this.isAvailable = false;
+});
+
+// Matches the default sort of the discover list
+userSchema.index({ status: 1, profileComplete: 1, isOnline: -1, role: 1, rating: -1 });
+
+export type UserDoc = HydratedDocument<InferSchemaType<typeof userSchema>>;
+export const User = model('User', userSchema);
