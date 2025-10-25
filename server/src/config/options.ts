@@ -36,6 +36,18 @@ export const INTERESTS = [
 
 export const GENDERS = ['male', 'female', 'other'] as const;
 
+export const ROOM_TOPICS = [
+  'Just chatting',
+  'Breakups',
+  'Career',
+  'Stress',
+  'Relationships',
+  'Music',
+  'Movies',
+  'Cricket',
+  'Late night talks',
+] as const;
+
 export const REPORT_REASONS = [
   'harassment',
   'abusive_language',

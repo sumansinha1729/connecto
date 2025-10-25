@@ -20,9 +20,16 @@ const userSchema = new Schema(
     isAvailable: { type: Boolean, default: false },
     isOnline: { type: Boolean, default: false },
     lastSeenAt: { type: Date, default: null },
+    /** Average of ratingSum / ratingCount, stored for sorting */
     rating: { type: Number, default: 0 },
+    ratingSum: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
     totalCalls: { type: Number, default: 0 },
+    /**
+     * The ringing/active call this user is in. Claimed with an atomic
+     * "only if null" update, so a user can never be in two calls at once.
+     */
+    activeCallId: { type: Schema.Types.ObjectId, ref: 'Call', default: null },
     /** Kept in sync on save; only complete profiles are shown to others */
     profileComplete: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'banned', 'deleted'], default: 'active' },

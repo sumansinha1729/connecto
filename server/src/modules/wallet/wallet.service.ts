@@ -93,6 +93,57 @@ export async function debit(entry: LedgerEntry): Promise<LedgerResult> {
   return { balance: wallet.balance, applied: true };
 }
 
+interface RunningEntry {
+  userId: UserId;
+  amount: number;
+  type: TransactionType;
+  /** Updated on every addition, e.g. "Call with Ananya · 3 min" */
+  description: string;
+  /** Identifies the single ledger row that all additions accumulate into */
+  entryKey: string;
+  meta?: Record<string, unknown>;
+}
+
+/**
+ * Debits coins into one running ledger row (e.g. one row per call instead of
+ * one per billed minute). The caller is responsible for not billing the same
+ * unit twice; the call engine guards this with a per-minute counter.
+ */
+export async function debitIntoEntry(entry: RunningEntry): Promise<number> {
+  assertPositive(entry.amount);
+  const wallet = await Wallet.findOneAndUpdate(
+    { userId: entry.userId, balance: { $gte: entry.amount } },
+    { $inc: { balance: -entry.amount } },
+    { returnDocument: 'after' },
+  );
+  if (!wallet) throw ApiError.badRequest('You don’t have enough coins for this.', 'INSUFFICIENT_BALANCE');
+  await upsertRunningEntry(entry, -entry.amount, wallet.balance);
+  return wallet.balance;
+}
+
+export async function creditIntoEntry(entry: RunningEntry): Promise<number> {
+  assertPositive(entry.amount);
+  const wallet = await Wallet.findOneAndUpdate(
+    { userId: entry.userId },
+    { $inc: { balance: entry.amount } },
+    { upsert: true, returnDocument: 'after' },
+  );
+  await upsertRunningEntry(entry, entry.amount, wallet.balance);
+  return wallet.balance;
+}
+
+async function upsertRunningEntry(entry: RunningEntry, signedAmount: number, balanceAfter: number) {
+  await Transaction.updateOne(
+    { idempotencyKey: entry.entryKey },
+    {
+      $inc: { amount: signedAmount },
+      $set: { balanceAfter, description: entry.description, ...(entry.meta && { meta: entry.meta }) },
+      $setOnInsert: { userId: entry.userId, type: entry.type },
+    },
+    { upsert: true },
+  );
+}
+
 export async function listTransactions(userId: UserId, { limit = 30, before }: { limit?: number; before?: Date } = {}) {
   return Transaction.find({ userId, ...(before && { createdAt: { $lt: before } }) })
     .sort({ createdAt: -1 })

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 
 import { authRouter } from './modules/auth/auth.routes';
+import { callsRouter } from './modules/calls/calls.routes';
+import { roomsRouter } from './modules/rooms/rooms.routes';
 import { usersRouter } from './modules/users/users.routes';
 import { walletRouter } from './modules/wallet/wallet.routes';
 
@@ -13,3 +15,5 @@ export const apiRouter = Router();
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/wallet', walletRouter);
+apiRouter.use('/calls', callsRouter);
+apiRouter.use('/rooms', roomsRouter);
