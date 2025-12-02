@@ -25,6 +25,8 @@ export type CallEndReason =
   | 'insufficient_balance';
 
 export interface ServerToClientEvents {
+  /** Your own account changed (e.g. listener application approved) — refresh `GET /users/me` */
+  'account:updated': (payload: { reason: 'listener_approved' | 'listener_rejected' | 'listener_revoked' }) => void;
   'call:incoming': (payload: { callId: string; from: PublicUser; expiresAt: string }) => void;
   'call:accepted': (payload: { callId: string; voice: VoiceCredentials | null }) => void;
   'call:ended': (payload: { callId: string; reason: CallEndReason; durationSec: number; coins: number }) => void;

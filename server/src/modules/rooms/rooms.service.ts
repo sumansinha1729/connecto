@@ -153,7 +153,7 @@ export async function leaveRoom(me: UserDoc | string, roomId: string) {
   await broadcast(room.id);
 }
 
-async function endRoom(roomId: string) {
+export async function endRoom(roomId: string) {
   const ended = await Room.findOneAndUpdate({ _id: roomId, status: 'live' }, { status: 'ended', endedAt: new Date() });
   if (!ended) return;
   emitToRoom(roomId, 'room:closed', { roomId });

@@ -33,6 +33,9 @@ const reportSchema = new Schema(
     reason: { type: String, enum: REPORT_REASONS, required: true },
     details: { type: String, default: '' },
     status: { type: String, enum: ['open', 'reviewed', 'actioned'], default: 'open' },
+    resolvedBy: { type: Types.ObjectId, ref: 'User', default: null },
+    resolvedAt: { type: Date, default: null },
+    resolutionNote: { type: String, default: null },
   },
   { timestamps: true },
 );

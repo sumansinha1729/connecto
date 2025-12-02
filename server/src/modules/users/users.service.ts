@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 
+import { env } from '../../config/env';
 import type { REPORT_REASONS } from '../../config/options';
 import { ApiError } from '../../utils/ApiError';
 import { revokeAllSessions } from '../auth/tokens';
@@ -52,10 +53,31 @@ export interface ProfileUpdate {
 }
 
 export async function updateProfile(user: UserDoc, update: ProfileUpdate): Promise<UserDoc> {
+  if (update.role === 'listener' && env.LISTENER_APPROVAL_REQUIRED && user.listenerStatus !== 'approved') {
+    throw ApiError.forbidden('Apply to become a listener first. Our team reviews applications within 24 hours.');
+  }
   user.set(update);
   // Turning listener mode on makes you available straight away unless you say otherwise
   if (update.role === 'listener' && update.isAvailable === undefined && user.isModified('role')) {
     user.isAvailable = true;
+  }
+  await user.save();
+  return user;
+}
+
+/** Asks to join the listener programme. Admins review it in the admin panel. */
+export async function applyAsListener(user: UserDoc, about: string): Promise<UserDoc> {
+  if (!user.profileComplete) throw ApiError.badRequest('Complete your profile before applying.');
+  if (user.listenerStatus === 'approved') throw ApiError.badRequest('You are already an approved listener.');
+  if (user.listenerStatus === 'pending') throw ApiError.conflict('Your application is already being reviewed.');
+
+  if (!env.LISTENER_APPROVAL_REQUIRED) {
+    user.set({ listenerStatus: 'approved', role: 'listener', isAvailable: true, 'listenerApplication.about': about });
+  } else {
+    user.set({
+      listenerStatus: 'pending',
+      listenerApplication: { about: about.trim(), appliedAt: new Date(), reviewedAt: null, reviewedBy: null, note: null },
+    });
   }
   await user.save();
   return user;

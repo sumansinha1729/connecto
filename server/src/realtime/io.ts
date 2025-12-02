@@ -33,6 +33,11 @@ export function removeUserFromRoomChannel(userId: string, roomId: string) {
   io?.in(userChannel(userId)).socketsLeave(roomChannel(roomId));
 }
 
+/** Force-disconnects every socket of a user (e.g. when banned) */
+export function disconnectUser(userId: string) {
+  io?.in(userChannel(userId)).disconnectSockets(true);
+}
+
 export function closeRoomChannel(roomId: string) {
   io?.in(roomChannel(roomId)).socketsLeave(roomChannel(roomId));
 }

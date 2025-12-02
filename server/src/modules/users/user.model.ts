@@ -33,6 +33,18 @@ const userSchema = new Schema(
     /** Kept in sync on save; only complete profiles are shown to others */
     profileComplete: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'banned', 'deleted'], default: 'active' },
+    banReason: { type: String, default: null },
+    bannedAt: { type: Date, default: null },
+
+    /** Listener programme: users apply, admins approve */
+    listenerStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
+    listenerApplication: {
+      about: { type: String, default: null },
+      appliedAt: { type: Date, default: null },
+      reviewedAt: { type: Date, default: null },
+      reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+      note: { type: String, default: null },
+    },
   },
   { timestamps: true },
 );
@@ -44,6 +56,7 @@ userSchema.pre('save', function () {
 
 // Matches the default sort of the discover list
 userSchema.index({ status: 1, profileComplete: 1, isOnline: -1, role: 1, rating: -1 });
+userSchema.index({ listenerStatus: 1, 'listenerApplication.appliedAt': 1 });
 
 export type UserDoc = HydratedDocument<InferSchemaType<typeof userSchema>>;
 export const User = model('User', userSchema);

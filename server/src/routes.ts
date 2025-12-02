@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { adminRouter } from './modules/admin/admin.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { callsRouter } from './modules/calls/calls.routes';
 import { roomsRouter } from './modules/rooms/rooms.routes';
@@ -17,3 +18,4 @@ apiRouter.use('/users', usersRouter);
 apiRouter.use('/wallet', walletRouter);
 apiRouter.use('/calls', callsRouter);
 apiRouter.use('/rooms', roomsRouter);
+apiRouter.use('/admin', adminRouter);

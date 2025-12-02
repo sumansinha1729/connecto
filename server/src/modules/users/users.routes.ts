@@ -8,6 +8,7 @@ import { AVATAR_PATTERN } from '../../utils/avatar';
 import { idParams } from '../../utils/validators';
 import { toMe } from './user.serializer';
 import {
+  applyAsListener,
   deleteAccount,
   getUserProfile,
   listBlocked,
@@ -73,6 +74,19 @@ usersRouter.delete('/me', async (req, res) => {
   await deleteAccount(currentUser(req));
   res.status(204).end();
 });
+
+usersRouter.post(
+  '/me/listener-application',
+  validate({
+    body: z.object({
+      about: z.string().trim().min(20, 'Tell us a bit more (at least 20 characters).').max(500),
+    }),
+  }),
+  async (req, res) => {
+    const user = await applyAsListener(currentUser(req), req.body.about);
+    res.json({ user: toMe(user) });
+  },
+);
 
 usersRouter.get('/me/favorites', async (req, res) => {
   res.json({ users: await listFavorites(currentUser(req)) });

@@ -43,6 +43,11 @@ const schema = z.object({
   /** How long a user may be disconnected before they count as offline (calls end, rooms are left) */
   PRESENCE_GRACE_SEC: z.coerce.number().int().nonnegative().default(15),
   ROOM_MAX_PARTICIPANTS: z.coerce.number().int().positive().default(200),
+  /** When true, users must apply and be approved by an admin before becoming listeners */
+  LISTENER_APPROVAL_REQUIRED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 
   // Agora voice (https://console.agora.io, project with "App ID + Token" auth).
   // Without these the server still runs calls/rooms, but returns no voice credentials.
