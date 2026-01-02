@@ -23,8 +23,9 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      await api.auth.requestOtp(phone);
-      router.push({ pathname: '/otp', params: { phone } });
+      const { devOtp } = await api.auth.requestOtp(phone);
+      // The server only returns devOtp outside production
+      router.push({ pathname: '/otp', params: { phone, ...(devOtp && { devOtp }) } });
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {

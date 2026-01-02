@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { colors, spacing } from '@/theme';
 import { IconButton } from './IconButton';
 import { Text } from './Text';
+import { goBack } from '@/utils/navigation';
 
 interface HeaderProps {
   title?: string;
@@ -15,7 +15,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, back = 'back', onBack, right }: HeaderProps) {
-  const handleBack = onBack ?? (() => router.back());
+  const handleBack = onBack ?? (goBack);
 
   return (
     <View style={styles.row}>

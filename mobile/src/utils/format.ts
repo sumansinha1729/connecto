@@ -33,9 +33,11 @@ export function formatCoins(amount: number, withSign = false): string {
   return amount >= 0 ? `+${abs}` : `-${abs}`;
 }
 
+/** "+919876543210" or "9876543210" → "+91 ••••••3210" */
 export function maskPhone(phone: string): string {
-  if (phone.length < 4) return phone;
-  return `+91 ${'•'.repeat(phone.length - 4)}${phone.slice(-4)}`;
+  const digits = phone.replace(/\D/g, '').slice(-10);
+  if (digits.length < 4) return phone;
+  return `+91 ${'•'.repeat(digits.length - 4)}${digits.slice(-4)}`;
 }
 
 const GENDER_LABEL: Record<Gender, string> = { male: 'M', female: 'F', other: 'Other' };
@@ -43,4 +45,19 @@ const GENDER_LABEL: Record<Gender, string> = { male: 'M', female: 'F', other: 'O
 /** "24 · F" */
 export function formatAgeGender(age: number | null, gender: Gender | null): string {
   return [age, gender ? GENDER_LABEL[gender] : null].filter(Boolean).join(' · ');
+}
+
+/** 12345 paise → "₹123.45" (drops ".00" for whole rupees) */
+export function formatRupees(paise: number, withSign = false): string {
+  const rupees = Math.abs(paise) / 100;
+  const text = `₹${rupees.toLocaleString('en-IN', { minimumFractionDigits: rupees % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  if (!withSign) return paise < 0 ? `-${text}` : text;
+  return paise >= 0 ? `+${text}` : `-${text}`;
+}
+
+/** "1996-04-15" → "15/04/1996" */
+export function formatDateOfBirth(iso: string | null): string | null {
+  if (!iso) return null;
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
 }

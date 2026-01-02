@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Icon, IconButton, Text, type IconName } from '@/components/ui';
 import { colors, spacing } from '@/theme';
 import type { CallRecord } from '@/types';
-import { formatCoins, formatRelativeTime, formatShortDuration } from '@/utils/format';
+import { formatCoins, formatRelativeTime, formatRupees, formatShortDuration } from '@/utils/format';
 
 function describe(call: CallRecord): { icon: IconName; color: string; label: string } {
   const outgoing = call.direction === 'outgoing';
@@ -28,12 +28,20 @@ function describe(call: CallRecord): { icon: IconName; color: string; label: str
 interface CallRowProps {
   call: CallRecord;
   onPress: () => void;
-  onCallBack: () => void;
+  /** Omit to hide the call-back button (listeners can't place calls) */
+  onCallBack?: () => void;
 }
 
 export function CallRow({ call, onPress, onCallBack }: CallRowProps) {
   const { icon, color, label } = describe(call);
-  const coins = call.direction === 'outgoing' ? -call.coins : call.coins;
+  const amount =
+    call.direction === 'outgoing'
+      ? call.coins > 0
+        ? { text: formatCoins(-call.coins, true), color: colors.textMuted }
+        : null
+      : call.earnedPaise > 0
+        ? { text: formatRupees(call.earnedPaise, true), color: colors.success }
+        : null;
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}>
@@ -49,12 +57,21 @@ export function CallRow({ call, onPress, onCallBack }: CallRowProps) {
           </Text>
         </View>
       </View>
-      {coins !== 0 && (
-        <Text variant="caption" style={{ color: coins > 0 ? colors.success : colors.textMuted, fontWeight: '600' }}>
-          {formatCoins(coins, true)}
+      {amount && (
+        <Text variant="caption" style={{ color: amount.color, fontWeight: '600' }}>
+          {amount.text}
         </Text>
       )}
-      <IconButton icon="call" size={40} color={colors.success} background={colors.successSoft} onPress={onCallBack} accessibilityLabel={`Call ${call.peer.name}`} />
+      {onCallBack && (
+        <IconButton
+          icon="call"
+          size={40}
+          color={colors.success}
+          background={colors.successSoft}
+          onPress={onCallBack}
+          accessibilityLabel={`Call ${call.peer.name}`}
+        />
+      )}
     </Pressable>
   );
 }

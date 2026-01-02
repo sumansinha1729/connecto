@@ -24,11 +24,11 @@ export function draftFromUser(user: Me): ProfileDraft {
   };
 }
 
-export function draftToUpdate(draft: ProfileDraft): ProfileUpdate {
+export function draftToUpdate(draft: ProfileDraft, { includeAge = true } = {}): ProfileUpdate {
   return {
     avatar: draft.avatar,
     name: draft.name.trim(),
-    age: Number(draft.age),
+    ...(includeAge && { age: Number(draft.age) }),
     gender: draft.gender,
     languages: draft.languages,
     interests: draft.interests,
@@ -36,10 +36,11 @@ export function draftToUpdate(draft: ProfileDraft): ProfileUpdate {
   };
 }
 
-export function validateBasics(draft: ProfileDraft): string | null {
+/** Listeners give their date of birth in the application instead of an age */
+export function validateBasics(draft: ProfileDraft, { requireAge = true } = {}): string | null {
   if (draft.name.trim().length < 2) return 'Enter a nickname with at least 2 characters.';
   const age = Number(draft.age);
-  if (!Number.isInteger(age) || age < MIN_AGE || age > 99) return `You must be ${MIN_AGE} or older to use Connecto.`;
+  if (requireAge && (!Number.isInteger(age) || age < MIN_AGE || age > 99)) return `You must be ${MIN_AGE} or older to use Connecto.`;
   if (!draft.gender) return 'Select your gender.';
   return null;
 }

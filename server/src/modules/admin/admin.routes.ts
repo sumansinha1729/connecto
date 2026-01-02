@@ -9,12 +9,15 @@ import {
   adjustWallet,
   approveListener,
   banUser,
+  declinePayout,
   endRoomAsAdmin,
   getStats,
   getUserDetail,
   listApplications,
   listAuditLog,
+  listPayouts,
   listReports,
+  payPayout,
   rejectListener,
   resolveReport,
   revokeListener,
@@ -147,6 +150,31 @@ adminRouter.post(
     res.status(204).end();
   },
 );
+
+// ---------- Payouts ----------
+
+adminRouter.get(
+  '/payouts',
+  validate({ query: z.object({ status: z.enum(['requested', 'paid', 'rejected']).default('requested'), ...page }) }),
+  async (_req, res) => {
+    const { status, ...paging } = res.locals.query as { status: 'requested' | 'paid' | 'rejected'; page: number; limit: number };
+    res.json(await listPayouts(status, paging));
+  },
+);
+
+adminRouter.post(
+  '/payouts/:id/paid',
+  validate({ params: idParams, body: z.object({ reference: z.string().trim().min(4, 'Enter the UPI/bank reference.').max(64) }) }),
+  async (req, res) => {
+    await payPayout(currentUser(req), id(req), req.body.reference);
+    res.status(204).end();
+  },
+);
+
+adminRouter.post('/payouts/:id/reject', validate({ params: idParams, body: z.object({ note }) }), async (req, res) => {
+  await declinePayout(currentUser(req), id(req), req.body.note);
+  res.status(204).end();
+});
 
 // ---------- Rooms & audit ----------
 

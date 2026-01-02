@@ -3,9 +3,18 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { CallManager } from '@/components/calls/CallManager';
-import { selectIsLoggedIn, selectProfileComplete, useAuthStore } from '@/store/authStore';
+import { api } from '@/services';
+import {
+  selectIsAdmin,
+  selectIsListener,
+  selectIsLoggedIn,
+  selectIsPendingApplicant,
+  selectProfileComplete,
+  useAuthStore,
+} from '@/store/authStore';
 import { bindRealtimeToStores } from '@/store/bindings';
 import { useCallStore } from '@/store/callStore';
+import { useEarningsStore } from '@/store/earningsStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors } from '@/theme';
 
@@ -27,6 +36,10 @@ export default function RootLayout() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const isLoggedIn = useAuthStore(selectIsLoggedIn);
   const profileComplete = useAuthStore(selectProfileComplete);
+  const isAdmin = useAuthStore(selectIsAdmin);
+  const isListener = useAuthStore(selectIsListener);
+  const isPendingApplicant = useAuthStore(selectIsPendingApplicant);
+  const inApp = isLoggedIn && profileComplete && !isPendingApplicant;
 
   useEffect(() => bindRealtimeToStores(), []);
 
@@ -34,17 +47,26 @@ export default function RootLayout() {
     if (hydrated) SplashScreen.hide();
   }, [hydrated]);
 
-  // Load fresh account data after login / app start, and clear it on logout
+  // While logged in: keep the live connection open (it's also what makes you "online"),
+  // and load fresh account data. On logout, close it and clear everything.
   useEffect(() => {
     if (!hydrated) return;
     if (isLoggedIn) {
+      api.connection.connect();
       useAuthStore.getState().refreshMe();
       useWalletStore.getState().refresh().catch(() => {});
     } else {
+      api.connection.disconnect();
       useWalletStore.getState().reset();
+      useEarningsStore.getState().reset();
       useCallStore.getState().reset();
     }
   }, [hydrated, isLoggedIn]);
+
+  // Listener earnings load as soon as the account is (or becomes) a listener
+  useEffect(() => {
+    if (isListener) useEarningsStore.getState().refresh().catch(() => {});
+  }, [isListener]);
 
   if (!hydrated) return null;
 
@@ -60,7 +82,12 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
 
-        <Stack.Protected guard={isLoggedIn && profileComplete}>
+        {/* Chose "become a listener" at signup: wait for the review */}
+        <Stack.Protected guard={isLoggedIn && profileComplete && isPendingApplicant}>
+          <Stack.Screen name="application" />
+        </Stack.Protected>
+
+        <Stack.Protected guard={inApp}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="user/[id]" />
           <Stack.Screen name="match" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -72,12 +99,26 @@ export default function RootLayout() {
           <Stack.Screen name="room/create" options={{ presentation: 'modal' }} />
           <Stack.Screen name="recharge" options={{ presentation: 'modal' }} />
           <Stack.Screen name="report/[id]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="payout-method" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" />
           <Stack.Screen name="favorites" />
           <Stack.Screen name="blocked" />
         </Stack.Protected>
+
+        {/* Apply / edit an application: from Profile (users) or the review screen (applicants) */}
+        <Stack.Protected guard={isLoggedIn && profileComplete && !isListener}>
+          <Stack.Screen name="listener-apply" options={{ presentation: 'modal' }} />
+        </Stack.Protected>
+
+        <Stack.Protected guard={inApp && isAdmin}>
+          <Stack.Screen name="admin/applications" />
+          <Stack.Screen name="admin/payouts" />
+          <Stack.Screen name="admin/reports" />
+          <Stack.Screen name="admin/users" />
+          <Stack.Screen name="admin/user/[id]" />
+        </Stack.Protected>
       </Stack>
-      {isLoggedIn && <CallManager />}
+      {inApp && <CallManager />}
     </ThemeProvider>
   );
 }

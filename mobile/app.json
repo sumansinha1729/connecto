@@ -30,7 +30,13 @@
       "expo-router",
       "expo-status-bar",
       "expo-image",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Connecto uses the microphone for voice calls, voice rooms and your listener voice intro."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

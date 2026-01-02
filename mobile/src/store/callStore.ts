@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { api } from '@/services';
-import type { CallDirection, CallEndReason, User } from '@/types';
+import type { CallDirection, CallEndReason, User, VoiceCredentials } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
 
 /**
@@ -16,11 +16,15 @@ interface CallState {
   peer: User | null;
   direction: CallDirection | null;
   connectedAt: number | null;
+  /** Agora credentials for this call (null in demo mode or until Agora is configured) */
+  voice: VoiceCredentials | null;
   muted: boolean;
   speaker: boolean;
   endReason: CallEndReason | null;
   durationSec: number;
   coins: number;
+  /** What the listener earned (paise) */
+  earnedPaise: number;
   /** Set when the call couldn't be started at all */
   error: string | null;
   rated: boolean;
@@ -36,8 +40,8 @@ interface CallState {
 
   // Realtime event handlers (wired up in store/bindings.ts)
   onIncoming: (callId: string, from: User) => void;
-  onAccepted: (callId: string) => void;
-  onEnded: (callId: string, reason: CallEndReason, durationSec: number, coins: number) => void;
+  onAccepted: (callId: string, voice: VoiceCredentials | null) => void;
+  onEnded: (callId: string, reason: CallEndReason, durationSec: number, coins: number, earnedPaise: number) => void;
 }
 
 const initialState = {
@@ -46,11 +50,13 @@ const initialState = {
   peer: null,
   direction: null,
   connectedAt: null,
+  voice: null,
   muted: false,
   speaker: false,
   endReason: null,
   durationSec: 0,
   coins: 0,
+  earnedPaise: 0,
   error: null,
   rated: false,
 };
@@ -80,7 +86,8 @@ export const useCallStore = create<CallState>()((set, get) => ({
     const { callId, phase } = get();
     if (!callId || phase !== 'incoming') return;
     try {
-      await api.calls.acceptCall(callId);
+      const { voice } = await api.calls.acceptCall(callId);
+      set({ voice });
     } catch (error) {
       set({ phase: 'ended', error: getErrorMessage(error) });
     }
@@ -121,13 +128,13 @@ export const useCallStore = create<CallState>()((set, get) => ({
     set({ ...initialState, phase: 'incoming', callId, peer: from, direction: 'incoming' });
   },
 
-  onAccepted: (callId) => {
+  onAccepted: (callId, voice) => {
     if (get().callId !== callId) return;
-    set({ phase: 'connected', connectedAt: Date.now() });
+    set({ phase: 'connected', connectedAt: Date.now(), voice: voice ?? get().voice });
   },
 
-  onEnded: (callId, reason, durationSec, coins) => {
+  onEnded: (callId, reason, durationSec, coins, earnedPaise) => {
     if (get().callId !== callId) return;
-    set({ phase: 'ended', endReason: reason, durationSec, coins });
+    set({ phase: 'ended', endReason: reason, durationSec, coins, earnedPaise });
   },
 }));

@@ -14,7 +14,16 @@ const userSchema = new Schema(
     interests: { type: [String], default: [] },
     /** "<style>:<seed>", rendered by DiceBear on the client */
     avatar: { type: String, required: true },
+    /**
+     * Account type. A user pays to call listeners; a listener only receives calls and
+     * earns. Only an admin approval turns an account into a listener.
+     */
     role: { type: String, enum: ['user', 'listener'], default: 'user' },
+    /**
+     * What the person chose at signup. "listener" accounts wait on the review screen
+     * until approved (or until they choose to continue as a user).
+     */
+    signupIntent: { type: String, enum: ['user', 'listener'], default: 'user' },
     isAdmin: { type: Boolean, default: false },
     /** Listener is accepting calls right now (always false for regular users) */
     isAvailable: { type: Boolean, default: false },
@@ -39,11 +48,27 @@ const userSchema = new Schema(
     /** Listener programme: users apply, admins approve */
     listenerStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
     listenerApplication: {
+      /** Private details, only admins see them */
+      fullName: { type: String, default: null },
+      dateOfBirth: { type: Date, default: null },
+      city: { type: String, default: null },
       about: { type: String, default: null },
+      voiceIntroKey: { type: String, default: null },
+      voiceIntroDurationSec: { type: Number, default: null },
       appliedAt: { type: Date, default: null },
       reviewedAt: { type: Date, default: null },
       reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+      /** Rejection reason shown to the applicant, or an internal note */
       note: { type: String, default: null },
+    },
+
+    /** Where a listener wants earnings paid (private) */
+    payoutMethod: {
+      kind: { type: String, enum: ['upi', 'bank'], default: null },
+      upiId: { type: String, default: null },
+      accountName: { type: String, default: null },
+      accountNumber: { type: String, default: null },
+      ifsc: { type: String, default: null },
     },
   },
   { timestamps: true },

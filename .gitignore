@@ -38,3 +38,6 @@ AGENTS.md
 # Documents are kept out of the repo
 *.md
 LICENSE
+
+# Uploaded files (voice intros) in development
+server/uploads/

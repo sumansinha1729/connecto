@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -15,6 +14,7 @@ import { Button, Header, Screen, Text } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { spacing } from '@/theme';
 import { getErrorMessage } from '@/utils/errors';
+import { goBack } from '@/utils/navigation';
 
 export default function EditProfileScreen() {
   const user = useAuthStore((s) => s.user);
@@ -34,7 +34,7 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       await updateProfile(draftToUpdate(draft));
-      router.back();
+      goBack();
     } catch (e) {
       setError(getErrorMessage(e));
       setSaving(false);

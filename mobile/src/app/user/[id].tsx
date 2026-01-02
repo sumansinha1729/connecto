@@ -9,20 +9,23 @@ import { CALL_RATE_PER_MIN } from '@/constants/config';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useStartCall } from '@/hooks/useStartCall';
 import { api } from '@/services';
+import { useAuthStore } from '@/store/authStore';
 import { colors, spacing } from '@/theme';
 import { confirm, notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
 import { formatAgeGender } from '@/utils/format';
+import { goBack } from '@/utils/navigation';
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const startCall = useStartCall();
+  const canCall = useAuthStore((s) => s.user?.role === 'user' && s.user.signupIntent === 'user');
   const [menuOpen, setMenuOpen] = useState(false);
 
   const { data, setData, loading, error, refresh } = useAsyncData(
     async () => {
-      const [user, favorite] = await Promise.all([api.users.getUser(id), api.users.isFavorite(id)]);
-      return { user, favorite };
+      const { user, isFavorite } = await api.users.getProfile(id);
+      return { user, favorite: isFavorite };
     },
     [id],
   );
@@ -50,7 +53,7 @@ export default function UserProfileScreen() {
     if (!ok) return;
     try {
       await api.users.setBlocked(id, true);
-      router.back();
+      goBack();
     } catch (e) {
       notify('Couldn’t block user', getErrorMessage(e));
     }
@@ -76,6 +79,8 @@ export default function UserProfileScreen() {
 
   const { user, favorite } = data;
   const callable = isCallable(user);
+  // Only normal users call, and only listeners can be called
+  const showCall = canCall && user.role === 'listener';
   const isListener = user.role === 'listener';
 
   return (
@@ -91,13 +96,15 @@ export default function UserProfileScreen() {
             color={favorite ? colors.accent : colors.text}
             accessibilityLabel={favorite ? 'Remove from favourites' : 'Add to favourites'}
           />
-          <Button
-            title={callable ? `Call · ${CALL_RATE_PER_MIN} coins/min` : 'Not available right now'}
-            icon="call"
-            onPress={() => startCall(user)}
-            disabled={!callable}
-            style={styles.callButton}
-          />
+          {showCall && (
+            <Button
+              title={callable ? `Call · ${CALL_RATE_PER_MIN} coins/min` : 'Not available right now'}
+              icon="call"
+              onPress={() => startCall(user)}
+              disabled={!callable}
+              style={styles.callButton}
+            />
+          )}
         </View>
       }
     >

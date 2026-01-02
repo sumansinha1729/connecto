@@ -5,14 +5,12 @@ import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Button, EmptyState, Icon, LoadingView, Screen, Text } from '@/components/ui';
 import { TransactionRow } from '@/components/wallet/TransactionRow';
-import { CALL_RATE_PER_MIN, LISTENER_SHARE } from '@/constants/config';
-import { useAuthStore } from '@/store/authStore';
+import { CALL_RATE_PER_MIN } from '@/constants/config';
 import { useWalletStore } from '@/store/walletStore';
 import { colors, gradients, radius, spacing } from '@/theme';
 import { formatCoins } from '@/utils/format';
 
 export default function WalletScreen() {
-  const isListener = useAuthStore((s) => s.user?.role === 'listener');
   const { balance, transactions, loaded, refresh } = useWalletStore();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -58,7 +56,6 @@ export default function WalletScreen() {
               <Icon name="information-circle" size={18} color={colors.textMuted} />
               <Text variant="caption" color="muted" style={styles.infoText}>
                 Calls cost {CALL_RATE_PER_MIN} coins per minute, charged at the start of each minute.
-                {isListener ? ` As a listener you earn ${CALL_RATE_PER_MIN * LISTENER_SHARE} coins for every minute you take calls.` : ''}
               </Text>
             </View>
 

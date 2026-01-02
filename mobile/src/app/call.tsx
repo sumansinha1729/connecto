@@ -14,7 +14,7 @@ import { isCallActive, useCallStore } from '@/store/callStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors, gradients, spacing } from '@/theme';
 import type { CallDirection, CallEndReason } from '@/types';
-import { formatDuration, formatShortDuration } from '@/utils/format';
+import { formatDuration, formatRupees, formatShortDuration } from '@/utils/format';
 
 function endTitle(reason: CallEndReason | null, direction: CallDirection | null, name: string): string {
   const outgoing = direction === 'outgoing';
@@ -190,10 +190,10 @@ export default function CallScreen() {
                       </View>
                       <View style={styles.summaryItem}>
                         <Text variant="heading" color={outgoing ? 'default' : 'success'}>
-                          {outgoing ? call.coins : `+${call.coins}`}
+                          {outgoing ? call.coins : formatRupees(call.earnedPaise, true)}
                         </Text>
                         <Text variant="caption" color="muted">
-                          {outgoing ? 'Coins spent' : 'Coins earned'}
+                          {outgoing ? 'Coins spent' : 'You earned'}
                         </Text>
                       </View>
                     </View>

@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 
 import { api } from '@/services';
-import type { Room, RoomParticipant, RoomRole } from '@/types';
+import type { Room, RoomParticipant, RoomRole, VoiceCredentials } from '@/types';
 
 export type RoomExitReason = 'closed' | 'removed';
 
 interface RoomState {
   room: Room | null;
+  /** Agora credentials for the room (speaker or listen-only) */
+  voice: VoiceCredentials | null;
   speakingIds: string[];
   /** Set when the room ended or you were removed while inside it */
   exitReason: RoomExitReason | null;
@@ -21,6 +23,7 @@ interface RoomState {
   // Realtime event handlers (wired up in store/bindings.ts)
   onUpdated: (room: Room) => void;
   onSpeaking: (roomId: string, userIds: string[]) => void;
+  onVoice: (roomId: string, voice: VoiceCredentials | null) => void;
   onExit: (roomId: string, reason: RoomExitReason) => void;
 }
 
@@ -33,19 +36,20 @@ export const useRoomStore = create<RoomState>()((set, get) => {
 
   return {
     room: null,
+    voice: null,
     speakingIds: [],
     exitReason: null,
 
     join: async (id) => {
-      set({ room: null, speakingIds: [], exitReason: null });
-      const room = await api.rooms.joinRoom(id);
-      set({ room });
+      set({ room: null, voice: null, speakingIds: [], exitReason: null });
+      const { room, voice } = await api.rooms.joinRoom(id);
+      set({ room, voice });
       return room;
     },
 
     leave: async () => {
       const id = get().room?.id;
-      set({ room: null, speakingIds: [], exitReason: null });
+      set({ room: null, voice: null, speakingIds: [], exitReason: null });
       if (id) await api.rooms.leaveRoom(id);
     },
 
@@ -62,8 +66,12 @@ export const useRoomStore = create<RoomState>()((set, get) => {
       if (get().room?.id === id) set({ speakingIds: userIds });
     },
 
+    onVoice: (id, voice) => {
+      if (get().room?.id === id) set({ voice });
+    },
+
     onExit: (id, reason) => {
-      if (get().room?.id === id) set({ room: null, speakingIds: [], exitReason: reason });
+      if (get().room?.id === id) set({ room: null, voice: null, speakingIds: [], exitReason: reason });
     },
   };
 });

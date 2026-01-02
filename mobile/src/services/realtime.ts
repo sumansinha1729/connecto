@@ -1,23 +1,32 @@
 /**
- * Server → client realtime events. In mock mode the mock backend emits these
- * directly; with the real backend they will be forwarded from Socket.IO.
+ * Server → client realtime events, forwarded from Socket.IO (see http/socket.ts).
+ * Mirrors server/src/realtime/events.ts.
  */
-import type { CallEndReason, Room, User } from '@/types';
+import type { CallEndReason, Room, User, VoiceCredentials } from '@/types';
 
 export interface ServerEvents {
-  'call:incoming': { callId: string; from: User };
-  'call:accepted': { callId: string };
+  'call:incoming': { callId: string; from: User; expiresAt?: string };
+  'call:accepted': { callId: string; voice?: VoiceCredentials | null };
   'call:ended': {
     callId: string;
     reason: CallEndReason;
     durationSec: number;
+    /** Coins the caller spent */
     coins: number;
+    /** ₹ the listener earned, in paise */
+    earnedPaise?: number;
   };
   'wallet:balance': { balance: number };
+  'earnings:balance': { balancePaise: number };
   'room:updated': { room: Room };
+  /** Who is talking; filled from Agora's volume indication once real voice is added */
   'room:speaking': { roomId: string; userIds: string[] };
+  /** New voice credentials after your room role changed */
+  'room:voice': { roomId: string; voice: VoiceCredentials | null };
   'room:closed': { roomId: string };
   'room:removed': { roomId: string };
+  /** Your account changed on the server (e.g. listener application reviewed) */
+  'account:updated': { reason: string };
 }
 
 type Handler<T> = (payload: T) => void;

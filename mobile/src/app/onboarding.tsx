@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { ApplicationSteps } from '@/components/listener/ApplicationSteps';
+import { RoleChoice } from '@/components/onboarding/RoleChoice';
 import { AvatarPicker } from '@/components/profile/AvatarPicker';
 import { BasicInfoFields, PreferenceFields } from '@/components/profile/ProfileFields';
 import {
@@ -16,21 +18,56 @@ import { useAuthStore } from '@/store/authStore';
 import { colors, radius, spacing } from '@/theme';
 import { getErrorMessage } from '@/utils/errors';
 
-const STEPS = [
-  { title: 'Pick your avatar', subtitle: 'This is how others will see you.' },
-  { title: 'About you', subtitle: 'Only your nickname, age and gender are shown.' },
-  { title: 'Your vibe', subtitle: 'We use this to match you with the right people.' },
-];
+type Path = 'user' | 'listener';
 
+const PROFILE_STEPS = [
+  { key: 'avatar', title: 'Pick your avatar', subtitle: 'This is how others will see you.' },
+  { key: 'basics', title: 'About you', subtitle: 'Only your nickname, age and gender are shown.' },
+  { key: 'prefs', title: 'Your vibe', subtitle: 'We use this to match you with the right people.' },
+] as const;
+
+/**
+ * New accounts: choose a path, set up the public profile, and (listeners only)
+ * fill in the application that an admin reviews.
+ */
 export default function OnboardingScreen() {
-  const user = useAuthStore((s) => s.user);
+  const user = useAuthStore((s) => s.user)!;
   const updateProfile = useAuthStore((s) => s.updateProfile);
+  const setIntent = useAuthStore((s) => s.setIntent);
   const logout = useAuthStore((s) => s.logout);
 
+  const [path, setPath] = useState<Path | null>(user.signupIntent === 'listener' ? 'listener' : null);
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<ProfileDraft>(() => draftFromUser(user!));
+  const [inApplication, setInApplication] = useState(false);
+  const [draft, setDraft] = useState<ProfileDraft>(() => draftFromUser(user));
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const isListenerPath = path === 'listener';
+
+  const choose = async (role: Path) => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (role !== user.signupIntent) await setIntent(role);
+      setPath(role);
+      setStep(0);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Back from the first profile step: choose again (undoing a "listener" choice) */
+  const backToChoice = async () => {
+    try {
+      if (useAuthStore.getState().user?.signupIntent === 'listener') await setIntent('user');
+      setPath(null);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  };
 
   const change = (patch: Partial<ProfileDraft>) => {
     setDraft((d) => ({ ...d, ...patch }));
@@ -38,20 +75,61 @@ export default function OnboardingScreen() {
   };
 
   const next = async () => {
-    const validation = step === 1 ? validateBasics(draft) : step === 2 ? validatePreferences(draft) : null;
-    if (validation) return setError(validation);
-    if (step < STEPS.length - 1) return setStep(step + 1);
+    const key = PROFILE_STEPS[step].key;
+    const problem =
+      key === 'basics' ? validateBasics(draft, { requireAge: !isListenerPath }) : key === 'prefs' ? validatePreferences(draft) : null;
+    if (problem) return setError(problem);
+    if (step < PROFILE_STEPS.length - 1) return setStep(step + 1);
 
-    setSaving(true);
+    setBusy(true);
     try {
-      await updateProfile(draftToUpdate(draft));
-      router.replace('/');
+      await updateProfile(draftToUpdate(draft, { includeAge: !isListenerPath }));
+      if (isListenerPath) setInApplication(true);
+      else router.replace('/');
     } catch (e) {
       setError(getErrorMessage(e));
-      setSaving(false);
+    } finally {
+      setBusy(false);
     }
   };
 
+  // Listener path, part 2: the application itself
+  if (isListenerPath && inApplication) {
+    return (
+      <ApplicationSteps
+        onExit={() => setInApplication(false)}
+        onSubmitted={() => router.replace('/application')}
+      />
+    );
+  }
+
+  // First screen: choose a path
+  if (!path) {
+    return (
+      <Screen scroll padded={false}>
+        <Header back={false} right={<Button title="Log out" variant="ghost" size="sm" onPress={logout} />} />
+        <View style={styles.content}>
+          <View style={styles.titles}>
+            <Text variant="title">Welcome to Connecto</Text>
+            <Text variant="body" color="muted">
+              How would you like to use the app?
+            </Text>
+          </View>
+          <RoleChoice onChoose={choose} disabled={busy} />
+          {error && (
+            <Text variant="caption" color="danger">
+              {error}
+            </Text>
+          )}
+          <Text variant="caption" color="faint" center>
+            One account is either a user or a listener. You can also apply to become a listener later.
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  const current = PROFILE_STEPS[step];
   return (
     <Screen
       scroll
@@ -64,34 +142,38 @@ export default function OnboardingScreen() {
               {error}
             </Text>
           )}
-          <Button title={step === STEPS.length - 1 ? 'Start talking' : 'Continue'} onPress={next} loading={saving} />
+          <Button
+            title={step === PROFILE_STEPS.length - 1 ? (isListenerPath ? 'Continue to application' : 'Start talking') : 'Continue'}
+            onPress={next}
+            loading={busy}
+          />
         </View>
       }
     >
-      <Header
-        back={step > 0 ? 'back' : false}
-        onBack={() => setStep(step - 1)}
-        right={
-          step === 0 ? <Button title="Log out" variant="ghost" size="sm" onPress={logout} /> : undefined
-        }
-      />
+      <Header back="back" onBack={() => (step > 0 ? setStep(step - 1) : backToChoice())} />
       <View style={styles.content}>
+        {isListenerPath && (
+          <View style={styles.badge}>
+            <Text variant="caption" color="primary" style={styles.badgeText}>
+              Listener application · step 1 of 2: your public profile
+            </Text>
+          </View>
+        )}
         <View style={styles.progress}>
-          {STEPS.map((_, i) => (
-            <View key={i} style={[styles.progressBar, i <= step && styles.progressActive]} />
+          {PROFILE_STEPS.map((s, i) => (
+            <View key={s.key} style={[styles.progressBar, i <= step && styles.progressActive]} />
           ))}
         </View>
-
         <View style={styles.titles}>
-          <Text variant="title">{STEPS[step].title}</Text>
+          <Text variant="title">{current.title}</Text>
           <Text variant="body" color="muted">
-            {STEPS[step].subtitle}
+            {isListenerPath && current.key === 'basics' ? 'Your nickname and gender are shown to callers.' : current.subtitle}
           </Text>
         </View>
 
-        {step === 0 && <AvatarPicker value={draft.avatar} onChange={(avatar) => change({ avatar })} />}
-        {step === 1 && <BasicInfoFields draft={draft} onChange={change} />}
-        {step === 2 && <PreferenceFields draft={draft} onChange={change} />}
+        {current.key === 'avatar' && <AvatarPicker value={draft.avatar} onChange={(avatar) => change({ avatar })} />}
+        {current.key === 'basics' && <BasicInfoFields draft={draft} onChange={change} showAge={!isListenerPath} />}
+        {current.key === 'prefs' && <PreferenceFields draft={draft} onChange={change} />}
       </View>
     </Screen>
   );
@@ -103,5 +185,7 @@ const styles = StyleSheet.create({
   progressBar: { flex: 1, height: 4, borderRadius: radius.full, backgroundColor: colors.border },
   progressActive: { backgroundColor: colors.primary },
   titles: { gap: spacing.xs },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.primarySoft },
+  badgeText: { fontWeight: '700' },
   footer: { gap: spacing.sm, paddingHorizontal: spacing.lg },
 });

@@ -1,14 +1,14 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { z } from 'zod';
 
 import { GENDERS, INTERESTS, LANGUAGES, MAX_INTERESTS, MAX_LANGUAGES, MIN_AGE, REPORT_REASONS } from '../../config/options';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { ApiError } from '../../utils/ApiError';
 import { AVATAR_PATTERN } from '../../utils/avatar';
 import { idParams } from '../../utils/validators';
 import { toMe } from './user.serializer';
 import {
-  applyAsListener,
   deleteAccount,
   getUserProfile,
   listBlocked,
@@ -17,7 +17,10 @@ import {
   reportUser,
   setBlocked,
   setFavorite,
+  setSignupIntent,
+  submitListenerApplication,
   updateProfile,
+  uploadVoiceIntro,
   type UserFilters,
 } from './users.service';
 
@@ -39,7 +42,6 @@ const profileUpdate = z
     languages: unique(z.enum(LANGUAGES), MAX_LANGUAGES, 'languages'),
     interests: unique(z.enum(INTERESTS), MAX_INTERESTS, 'interests'),
     avatar: z.string().regex(AVATAR_PATTERN, 'Invalid avatar.'),
-    role: z.enum(['user', 'listener']),
     isAvailable: z.boolean(),
   })
   .partial()
@@ -75,16 +77,35 @@ usersRouter.delete('/me', async (req, res) => {
   res.status(204).end();
 });
 
+/** First screen after signup: "I want to talk" (user) or "I want to be a listener" */
+usersRouter.post('/me/intent', validate({ body: z.object({ intent: z.enum(['user', 'listener']) }) }), async (req, res) => {
+  res.json({ user: toMe(await setSignupIntent(currentUser(req), req.body.intent)) });
+});
+
+/** Listener voice intro: raw audio body, length in the X-Duration-Sec header */
+usersRouter.put('/me/voice-intro', express.raw({ type: 'audio/*', limit: '5mb' }), async (req, res) => {
+  if (!Buffer.isBuffer(req.body)) throw ApiError.badRequest('Send the recording as audio.');
+  const user = await uploadVoiceIntro(
+    currentUser(req),
+    req.body,
+    req.get('content-type') ?? '',
+    Number(req.get('x-duration-sec')),
+  );
+  res.json({ user: toMe(user) });
+});
+
 usersRouter.post(
   '/me/listener-application',
   validate({
     body: z.object({
+      fullName: z.string().trim().min(3, 'Enter your full name.').max(80),
+      dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your date of birth as YYYY-MM-DD.'),
+      city: z.string().trim().min(2, 'Enter your city.').max(60),
       about: z.string().trim().min(20, 'Tell us a bit more (at least 20 characters).').max(500),
     }),
   }),
   async (req, res) => {
-    const user = await applyAsListener(currentUser(req), req.body.about);
-    res.json({ user: toMe(user) });
+    res.json({ user: toMe(await submitListenerApplication(currentUser(req), req.body)) });
   },
 );
 

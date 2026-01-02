@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -9,13 +9,14 @@ import { UserCard } from '@/components/users/UserCard';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useStartCall } from '@/hooks/useStartCall';
 import { api } from '@/services';
-import { useAuthStore } from '@/store/authStore';
+import { selectIsListener, useAuthStore } from '@/store/authStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors, gradients, radius, spacing } from '@/theme';
 import type { UserFilters } from '@/types';
 
 export default function HomeScreen() {
   const me = useAuthStore((s) => s.user);
+  const isListener = useAuthStore(selectIsListener);
   const balance = useWalletStore((s) => s.balance);
   const startCall = useStartCall();
 
@@ -25,6 +26,8 @@ export default function HomeScreen() {
     [filters],
     { refetchOnFocus: true },
   );
+
+  if (isListener) return <Redirect href="/listener" />;
 
   const header = (
     <View style={styles.header}>
@@ -68,7 +71,7 @@ export default function HomeScreen() {
         )}
       </Pressable>
 
-      <Text variant="heading">People to talk to</Text>
+      <Text variant="heading">Listeners</Text>
       <View style={styles.filters}>
         <FilterBar value={filters} onChange={setFilters} preferredLanguages={me?.languages} />
       </View>

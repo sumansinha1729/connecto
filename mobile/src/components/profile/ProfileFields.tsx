@@ -12,7 +12,7 @@ interface FieldsProps {
   onChange: (patch: Partial<ProfileDraft>) => void;
 }
 
-export function BasicInfoFields({ draft, onChange }: FieldsProps) {
+export function BasicInfoFields({ draft, onChange, showAge = true }: FieldsProps & { showAge?: boolean }) {
   return (
     <View style={styles.section}>
       <TextField
@@ -24,14 +24,16 @@ export function BasicInfoFields({ draft, onChange }: FieldsProps) {
         autoCapitalize="words"
         hint="Use a nickname if you want to stay anonymous."
       />
-      <TextField
-        label="Age"
-        placeholder="18"
-        value={draft.age}
-        onChangeText={(age) => onChange({ age: age.replace(/\D/g, '') })}
-        keyboardType="number-pad"
-        maxLength={2}
-      />
+      {showAge && (
+        <TextField
+          label="Age"
+          placeholder="18"
+          value={draft.age}
+          onChangeText={(age) => onChange({ age: age.replace(/\D/g, '') })}
+          keyboardType="number-pad"
+          maxLength={2}
+        />
+      )}
       <ChipSelect
         label="Gender"
         options={GENDER_OPTIONS}

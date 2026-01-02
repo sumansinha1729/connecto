@@ -23,6 +23,7 @@ import { colors, radius, spacing } from '@/theme';
 import type { RoomParticipant } from '@/types';
 import { confirm, notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
+import { goBack } from '@/utils/navigation';
 
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,7 +53,7 @@ export default function RoomScreen() {
   useEffect(() => {
     if (!exitReason) return;
     notify(exitReason === 'closed' ? 'Room ended' : 'Removed from room', exitReason === 'closed' ? 'The host has ended this room.' : 'The host removed you from this room.');
-    router.back();
+    goBack();
   }, [exitReason]);
 
   const me = findParticipant(room, meId);
@@ -68,7 +69,7 @@ export default function RoomScreen() {
       });
       if (!ok) return;
     }
-    router.back();
+    goBack();
   }, [isHost]);
 
   // Android back button: confirm before the host ends the room

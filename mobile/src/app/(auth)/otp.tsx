@@ -3,14 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Header, Screen, Text } from '@/components/ui';
-import { DEV_OTP, OTP_LENGTH, OTP_RESEND_SEC } from '@/constants/config';
+import { OTP_LENGTH, OTP_RESEND_SEC } from '@/constants/config';
 import { api } from '@/services';
 import { useAuthStore } from '@/store/authStore';
 import { colors, fontSize, radius, spacing } from '@/theme';
 import { getErrorMessage } from '@/utils/errors';
 
 export default function OtpScreen() {
-  const { phone = '' } = useLocalSearchParams<{ phone: string }>();
+  const { phone = '', devOtp } = useLocalSearchParams<{ phone: string; devOtp?: string }>();
   const signIn = useAuthStore((s) => s.signIn);
   const inputRef = useRef<TextInput>(null);
 
@@ -29,8 +29,8 @@ export default function OtpScreen() {
     setLoading(true);
     setError(null);
     try {
-      const { token, user } = await api.auth.verifyOtp(phone, value);
-      signIn(token, user);
+      const { tokens, user } = await api.auth.verifyOtp(phone, value);
+      signIn(tokens, user);
       router.replace('/');
     } catch (e) {
       setError(getErrorMessage(e));
@@ -119,11 +119,13 @@ export default function OtpScreen() {
           )}
         </View>
 
-        <View style={styles.devHint}>
-          <Text variant="caption" color="muted">
-            Demo mode: use code <Text variant="caption" color="primary" style={styles.bold}>{DEV_OTP}</Text>
-          </Text>
-        </View>
+        {devOtp && (
+          <View style={styles.devHint}>
+            <Text variant="caption" color="muted">
+              Test mode: use code <Text variant="caption" color="primary" style={styles.bold}>{devOtp}</Text>
+            </Text>
+          </View>
+        )}
       </View>
     </Screen>
   );

@@ -1,35 +1,45 @@
 /**
- * Service contracts. Screens and stores only depend on these interfaces,
- * so the mock implementation can be swapped for the real HTTP/Socket.IO
- * backend without touching UI code.
+ * Service contracts. Screens and stores only depend on these interfaces;
+ * `http/` implements them against the backend.
  */
 import type {
+  AuthTokens,
   CallRecord,
   CreateRoomInput,
+  EarningsSummary,
+  ListenerApplicationInput,
   Me,
+  PayoutMethodInput,
   ProfileUpdate,
   ReportReason,
   Room,
   RoomRole,
   User,
   UserFilters,
+  VoiceCredentials,
   Wallet,
 } from '@/types';
 
 export interface AuthService {
   requestOtp(phone: string): Promise<{ devOtp?: string }>;
-  verifyOtp(phone: string, code: string): Promise<{ token: string; user: Me; isNewUser: boolean }>;
+  verifyOtp(phone: string, code: string): Promise<{ tokens: AuthTokens; user: Me; isNewUser: boolean }>;
   logout(): Promise<void>;
 }
 
 export interface UserService {
   getMe(): Promise<Me>;
   updateProfile(update: ProfileUpdate): Promise<Me>;
+  /** Signup choice: talk to listeners ("user") or become one ("listener") */
+  setIntent(intent: 'user' | 'listener'): Promise<Me>;
+  /** Uploads a recorded voice intro (local file/blob uri) */
+  uploadVoiceIntro(uri: string, durationSec: number): Promise<Me>;
+  /** Sends the listener application for admin review */
+  submitListenerApplication(input: ListenerApplicationInput): Promise<Me>;
   deleteAccount(): Promise<void>;
   listUsers(filters: UserFilters): Promise<User[]>;
-  getUser(userId: string): Promise<User>;
+  /** Someone's profile plus whether you've favourited them */
+  getProfile(userId: string): Promise<{ user: User; isFavorite: boolean }>;
   listFavorites(): Promise<User[]>;
-  isFavorite(userId: string): Promise<boolean>;
   setFavorite(userId: string, favorite: boolean): Promise<void>;
   listBlocked(): Promise<User[]>;
   setBlocked(userId: string, blocked: boolean): Promise<void>;
@@ -44,7 +54,7 @@ export interface WalletService {
 export interface CallService {
   /** Starts ringing the other user. Progress arrives via realtime `call:*` events. */
   startCall(userId: string): Promise<{ callId: string }>;
-  acceptCall(callId: string): Promise<void>;
+  acceptCall(callId: string): Promise<{ voice: VoiceCredentials | null }>;
   rejectCall(callId: string): Promise<void>;
   /** Hangs up an active call or cancels a ringing one */
   endCall(callId: string): Promise<void>;
@@ -52,14 +62,20 @@ export interface CallService {
   getHistory(): Promise<CallRecord[]>;
   /** Finds a random available listener to talk to */
   findMatch(language?: string | null): Promise<User>;
-  /** Development helper: makes a random online user call you */
-  simulateIncomingCall(): Promise<void>;
+}
+
+/** Listener-only: ₹ earnings and withdrawals */
+export interface EarningsService {
+  getSummary(): Promise<EarningsSummary>;
+  setPayoutMethod(method: PayoutMethodInput): Promise<Me>;
+  /** Withdraws the whole balance */
+  withdraw(): Promise<void>;
 }
 
 export interface RoomService {
   listRooms(): Promise<Room[]>;
   createRoom(input: CreateRoomInput): Promise<Room>;
-  joinRoom(roomId: string): Promise<Room>;
+  joinRoom(roomId: string): Promise<{ room: Room; voice: VoiceCredentials | null }>;
   leaveRoom(roomId: string): Promise<void>;
   setHandRaised(roomId: string, raised: boolean): Promise<void>;
   setMuted(roomId: string, muted: boolean): Promise<void>;
@@ -69,10 +85,18 @@ export interface RoomService {
   removeParticipant(roomId: string, userId: string): Promise<void>;
 }
 
+/** Live connection for server → client events */
+export interface RealtimeConnection {
+  connect(): void;
+  disconnect(): void;
+}
+
 export interface Api {
   auth: AuthService;
   users: UserService;
   wallet: WalletService;
+  earnings: EarningsService;
   calls: CallService;
   rooms: RoomService;
+  connection: RealtimeConnection;
 }

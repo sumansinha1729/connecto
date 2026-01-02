@@ -12,6 +12,8 @@ import { User, type UserDoc } from '../users/user.model';
 import { toAdminUser } from '../users/user.serializer';
 import { Transaction } from '../wallet/wallet.model';
 import { credit, debit, getBalance, listTransactions, toTransactionDto } from '../wallet/wallet.service';
+import { EarningsAccount, PayoutRequest } from '../earnings/earnings.model';
+import { listPayouts, markPayoutPaid, rejectPayout, toPayoutDto } from '../earnings/earnings.service';
 import { AdminAction, type AdminActionType } from './adminAction.model';
 
 interface Page {
@@ -67,7 +69,9 @@ export async function searchUsers({ q, status, role, listenerStatus, page, limit
 
 export async function getUserDetail(userId: string) {
   const user = await getUserOrThrow(userId);
-  const [balance, transactions, calls, reportsAgainst, reportsMade, actions] = await Promise.all([
+  const [earnings, payouts, balance, transactions, calls, reportsAgainst, reportsMade, actions] = await Promise.all([
+    EarningsAccount.findOne({ userId: user._id }).lean(),
+    PayoutRequest.find({ userId: user._id }).sort({ createdAt: -1 }).limit(10),
     getBalance(user._id),
     listTransactions(user._id, { limit: 20 }),
     getHistory(user, { limit: 20 }),
@@ -78,6 +82,11 @@ export async function getUserDetail(userId: string) {
   return {
     user: toAdminUser(user),
     wallet: { balance, transactions: transactions.map(toTransactionDto) },
+    earnings: {
+      balancePaise: earnings?.balancePaise ?? 0,
+      lifetimePaise: earnings?.lifetimePaise ?? 0,
+      payouts: payouts.map(toPayoutDto),
+    },
     calls,
     reports: {
       against: reportsAgainst.map((r) => ({
@@ -161,12 +170,14 @@ export async function listApplications(status: 'pending' | 'approved' | 'rejecte
   return { applications: users.map(toAdminUser), total, page };
 }
 
+/** Approval turns the account into a listener (their coins stay, paused, while they are one) */
 export async function approveListener(admin: UserDoc, userId: string, note?: string) {
   const user = await User.findOneAndUpdate(
     { _id: userId, listenerStatus: 'pending', status: 'active' },
     {
       listenerStatus: 'approved',
       role: 'listener',
+      signupIntent: 'listener',
       isAvailable: true,
       'listenerApplication.reviewedAt': new Date(),
       'listenerApplication.reviewedBy': admin._id,
@@ -197,11 +208,11 @@ export async function rejectListener(admin: UserDoc, userId: string, note: strin
   return toAdminUser(user);
 }
 
-/** Takes listener rights away from an approved listener */
+/** Takes listener rights away: the account becomes a normal user again (paused coins usable again) */
 export async function revokeListener(admin: UserDoc, userId: string, note: string) {
   const user = await User.findOneAndUpdate(
     { _id: userId, listenerStatus: 'approved' },
-    { listenerStatus: 'rejected', role: 'user', isAvailable: false, 'listenerApplication.note': note },
+    { listenerStatus: 'rejected', role: 'user', signupIntent: 'user', isAvailable: false, 'listenerApplication.note': note },
     { returnDocument: 'after' },
   );
   if (!user) throw ApiError.conflict('This user is not an approved listener.');
@@ -268,6 +279,20 @@ export async function resolveReport(
   await audit(admin, 'resolve_report', report.userId, { reportId: report.id, status, note, ban: Boolean(ban) });
 }
 
+// ---------- Payouts ----------
+
+export { listPayouts };
+
+export async function payPayout(admin: UserDoc, payoutId: string, reference: string) {
+  const request = await markPayoutPaid(admin._id, payoutId, reference);
+  await audit(admin, 'mark_payout_paid', request.userId, { payoutId, amountPaise: request.amountPaise, reference });
+}
+
+export async function declinePayout(admin: UserDoc, payoutId: string, note: string) {
+  const request = await rejectPayout(admin._id, payoutId, note);
+  await audit(admin, 'reject_payout', request.userId, { payoutId, amountPaise: request.amountPaise, note });
+}
+
 // ---------- Rooms ----------
 
 export async function endRoomAsAdmin(admin: UserDoc, roomId: string) {
@@ -294,6 +319,8 @@ export async function getStats() {
     rechargeStats,
     reportsOpen,
     roomsLive,
+    payoutStats,
+    earnedStats,
   ] = await Promise.all([
     User.countDocuments({ status: { $ne: 'deleted' } }),
     User.countDocuments({ status: { $ne: 'deleted' }, createdAt: { $gte: since } }),
@@ -313,6 +340,14 @@ export async function getStats() {
     ]),
     Report.countDocuments({ status: 'open' }),
     Room.countDocuments({ status: 'live' }),
+    PayoutRequest.aggregate<{ count: number; paise: number }>([
+      { $match: { status: 'requested' } },
+      { $group: { _id: null, count: { $sum: 1 }, paise: { $sum: '$amountPaise' } } },
+    ]),
+    Call.aggregate<{ paise: number }>([
+      { $match: { status: 'completed', createdAt: { $gte: since } } },
+      { $group: { _id: null, paise: { $sum: '$earnedPaise' } } },
+    ]),
   ]);
 
   return {
@@ -327,6 +362,8 @@ export async function getStats() {
     revenue: { recharges24h: rechargeStats[0]?.count ?? 0, inr24h: rechargeStats[0]?.inr ?? 0, coins24h: rechargeStats[0]?.coins ?? 0 },
     reports: { open: reportsOpen },
     rooms: { live: roomsLive },
+    payouts: { pending: payoutStats[0]?.count ?? 0, pendingPaise: payoutStats[0]?.paise ?? 0 },
+    listenerEarnings24hPaise: earnedStats[0]?.paise ?? 0,
   };
 }
 

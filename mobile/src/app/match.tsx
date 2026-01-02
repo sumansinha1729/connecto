@@ -15,6 +15,7 @@ import { useWalletStore } from '@/store/walletStore';
 import { colors, gradients, spacing } from '@/theme';
 import type { User } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
+import { goBack } from '@/utils/navigation';
 
 type MatchState = { status: 'searching' } | { status: 'found'; user: User } | { status: 'error'; message: string };
 
@@ -133,7 +134,7 @@ export default function MatchScreen() {
               {state.status === 'error' && <Button title="Try again" icon="refresh" onPress={search} />}
             </>
           )}
-          <Button title="Cancel" variant="secondary" onPress={() => router.back()} />
+          <Button title="Cancel" variant="secondary" onPress={goBack} />
         </View>
       </SafeAreaView>
     </LinearGradient>

@@ -18,12 +18,6 @@ export function FilterBar({ value, onChange, preferredLanguages = [] }: FilterBa
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      <Chip
-        label="Listeners"
-        icon="ribbon"
-        selected={Boolean(value.listenersOnly)}
-        onPress={() => set({ listenersOnly: !value.listenersOnly })}
-      />
       <Chip label="Online" icon="radio-button-on" selected={Boolean(value.onlineOnly)} onPress={() => set({ onlineOnly: !value.onlineOnly })} />
       <View style={styles.divider} />
       {GENDER_OPTIONS.filter((g) => g.value !== 'other').map((g) => (

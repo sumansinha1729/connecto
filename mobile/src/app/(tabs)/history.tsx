@@ -6,10 +6,12 @@ import { EmptyState, LoadingView, Screen, Text } from '@/components/ui';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useStartCall } from '@/hooks/useStartCall';
 import { api } from '@/services';
+import { selectIsListener, useAuthStore } from '@/store/authStore';
 import { colors, spacing } from '@/theme';
 
 export default function HistoryScreen() {
   const startCall = useStartCall();
+  const isListener = useAuthStore(selectIsListener);
   const { data: calls, loading, refreshing, error, refresh } = useAsyncData(() => api.calls.getHistory(), [], {
     refetchOnFocus: true,
   });
@@ -20,7 +22,11 @@ export default function HistoryScreen() {
         data={calls ?? []}
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
-          <CallRow call={item} onPress={() => router.push(`/user/${item.peer.id}`)} onCallBack={() => startCall(item.peer)} />
+          <CallRow
+            call={item}
+            onPress={() => router.push(`/user/${item.peer.id}`)}
+            onCallBack={isListener ? undefined : () => startCall(item.peer)}
+          />
         )}
         ListHeaderComponent={
           <View style={styles.header}>

@@ -10,6 +10,7 @@ import {
   removeUserFromRoomChannel,
 } from '../../realtime/io';
 import { ApiError } from '../../utils/ApiError';
+import { actsAsUser, assertListener, isListener } from '../users/accountRules';
 import { User, type UserDoc } from '../users/user.model';
 import { toPublicUser, type PublicUser } from '../users/user.serializer';
 import { getBlockedIds, isBlockedEitherWay } from '../users/users.service';
@@ -93,7 +94,7 @@ export async function getRoom(me: UserDoc, roomId: string): Promise<RoomDto> {
 }
 
 export async function createRoom(host: UserDoc, input: { title: string; topic: string; language: string }) {
-  if (!host.profileComplete) throw ApiError.badRequest('Complete your profile before starting a room.');
+  assertListener(host, 'host voice rooms');
   await leaveAllRooms(host.id);
 
   const room = new Room({
@@ -111,6 +112,7 @@ export async function createRoom(host: UserDoc, input: { title: string; topic: s
 
 export async function joinRoom(me: UserDoc, roomId: string): Promise<{ room: RoomDto; voice: VoiceCredentials | null }> {
   if (!me.profileComplete) throw ApiError.badRequest('Complete your profile before joining rooms.');
+  if (!actsAsUser(me) && !isListener(me)) throw ApiError.forbidden('Your listener application is still being reviewed.');
   const room = await getLiveRoom(roomId);
   if (await isBlockedEitherWay(me._id, room.hostId)) throw ApiError.notFound('This room has ended.');
   if (room.removedUserIds.some((id) => String(id) === me.id)) throw ApiError.forbidden('The host removed you from this room.');

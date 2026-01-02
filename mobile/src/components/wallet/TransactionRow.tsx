@@ -10,6 +10,8 @@ const ICON: Record<TransactionType, IconName> = {
   recharge: 'add-circle',
   call_charge: 'call',
   call_earning: 'cash',
+  refund: 'arrow-undo',
+  adjustment: 'construct',
 };
 
 export function TransactionRow({ tx }: { tx: Transaction }) {

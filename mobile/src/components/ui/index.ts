@@ -5,6 +5,7 @@ export { Card } from './Card';
 export { Chip } from './Chip';
 export { CoinBadge } from './CoinBadge';
 export { EmptyState } from './EmptyState';
+export { FormSheet, type FormField } from './FormSheet';
 export { Header } from './Header';
 export { Icon, type IconName } from './Icon';
 export { IconButton } from './IconButton';

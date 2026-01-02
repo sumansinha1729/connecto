@@ -34,7 +34,16 @@ const schema = z.object({
   // Coins
   SIGNUP_BONUS_COINS: z.coerce.number().int().nonnegative().default(50),
   CALL_RATE_COINS_PER_MIN: z.coerce.number().int().positive().default(10),
-  LISTENER_SHARE_PERCENT: z.coerce.number().int().min(0).max(100).default(50),
+
+  // Listener earnings (in paise: 100 paise = ₹1)
+  LISTENER_EARNING_PAISE_PER_MIN: z.coerce.number().int().nonnegative().default(200),
+  PAYOUT_MIN_PAISE: z.coerce.number().int().positive().default(50_000),
+  /** Shown to listeners, e.g. "Payouts are sent every week" */
+  PAYOUT_SCHEDULE: z.enum(['daily', 'weekly', 'monthly']).default('weekly'),
+
+  // Voice intros
+  VOICE_INTRO_MIN_SEC: z.coerce.number().int().positive().default(30),
+  VOICE_INTRO_MAX_SEC: z.coerce.number().int().positive().default(60),
 
   // Calls & rooms
   CALL_RING_TIMEOUT_SEC: z.coerce.number().int().positive().default(30),
@@ -43,11 +52,12 @@ const schema = z.object({
   /** How long a user may be disconnected before they count as offline (calls end, rooms are left) */
   PRESENCE_GRACE_SEC: z.coerce.number().int().nonnegative().default(15),
   ROOM_MAX_PARTICIPANTS: z.coerce.number().int().positive().default(200),
-  /** When true, users must apply and be approved by an admin before becoming listeners */
-  LISTENER_APPROVAL_REQUIRED: z
-    .enum(['true', 'false'])
-    .default('true')
-    .transform((v) => v === 'true'),
+
+  // File storage (voice intros). "local" saves to STORAGE_DIR; "s3" comes later.
+  STORAGE_DRIVER: z.enum(['local']).default('local'),
+  STORAGE_DIR: z.string().default('uploads'),
+  /** Public URL of this server, used to build links to stored files */
+  PUBLIC_BASE_URL: z.string().url().optional(),
 
   // Agora voice (https://console.agora.io, project with "App ID + Token" auth).
   // Without these the server still runs calls/rooms, but returns no voice credentials.
@@ -75,6 +85,7 @@ export const env = {
   /** The dev OTP is never honoured in production, even if set by mistake */
   devOtp: isProduction ? undefined : parsed.data.DEV_OTP,
   billingIntervalSec: isProduction ? 60 : parsed.data.CALL_BILLING_INTERVAL_SEC,
+  publicBaseUrl: (parsed.data.PUBLIC_BASE_URL ?? `http://localhost:${parsed.data.PORT}`).replace(/\/+$/, ''),
   agora:
     parsed.data.AGORA_APP_ID && parsed.data.AGORA_APP_CERTIFICATE
       ? { appId: parsed.data.AGORA_APP_ID, certificate: parsed.data.AGORA_APP_CERTIFICATE }

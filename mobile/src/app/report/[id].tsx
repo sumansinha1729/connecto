@@ -9,6 +9,7 @@ import { colors, radius, spacing } from '@/theme';
 import type { ReportReason } from '@/types';
 import { notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
+import { goBack } from '@/utils/navigation';
 
 export default function ReportScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function ReportScreen() {
       if (alsoBlock) await api.users.setBlocked(id, true);
       notify('Report sent', 'Thank you. Our safety team will review it within 24 hours.');
       if (alsoBlock) router.dismissTo('/');
-      else router.back();
+      else goBack();
     } catch (e) {
       notify('Couldn’t send report', getErrorMessage(e));
       setSending(false);

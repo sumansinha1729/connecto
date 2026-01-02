@@ -7,6 +7,7 @@ import { env } from '../../config/env';
 import { RECHARGE_PACKS } from '../../config/options';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { assertActsAsUser } from '../users/accountRules';
 import { ApiError } from '../../utils/ApiError';
 import { credit, getBalance, listTransactions, toTransactionDto } from './wallet.service';
 
@@ -15,7 +16,7 @@ walletRouter.use(requireAuth);
 
 const pricing = () => ({
   callRatePerMin: env.CALL_RATE_COINS_PER_MIN,
-  listenerSharePercent: env.LISTENER_SHARE_PERCENT,
+  listenerEarningPaisePerMin: env.LISTENER_EARNING_PAISE_PER_MIN,
 });
 
 /** Balance + latest transactions + call pricing */
@@ -55,6 +56,7 @@ walletRouter.post('/recharge', validate({ body: z.object({ packId: z.string() })
   if (!pack) throw ApiError.notFound('This pack is no longer available.');
 
   const user = currentUser(req);
+  assertActsAsUser(user, 'buy coins');
   const total = pack.coins + pack.bonus;
   const { balance } = await credit({
     userId: user._id,

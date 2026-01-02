@@ -1,9 +1,11 @@
 import { Types } from 'mongoose';
 
 import { env } from '../../config/env';
-import type { REPORT_REASONS } from '../../config/options';
+import { MIN_AGE, type REPORT_REASONS } from '../../config/options';
 import { ApiError } from '../../utils/ApiError';
 import { revokeAllSessions } from '../auth/tokens';
+import { storage } from '../storage/storage';
+import { assertActsAsUser, isListener } from './accountRules';
 import { Block, Favorite, Report } from './relations.model';
 import { User, type UserDoc } from './user.model';
 import { toPublicUser } from './user.serializer';
@@ -48,37 +50,124 @@ export interface ProfileUpdate {
   languages?: string[];
   interests?: string[];
   avatar?: string;
-  role?: 'user' | 'listener';
+  /** Listeners only: accepting calls right now */
   isAvailable?: boolean;
 }
 
 export async function updateProfile(user: UserDoc, update: ProfileUpdate): Promise<UserDoc> {
-  if (update.role === 'listener' && env.LISTENER_APPROVAL_REQUIRED && user.listenerStatus !== 'approved') {
-    throw ApiError.forbidden('Apply to become a listener first. Our team reviews applications within 24 hours.');
+  if (update.isAvailable !== undefined && !isListener(user)) {
+    throw ApiError.forbidden('Only listeners can go available for calls.');
   }
   user.set(update);
-  // Turning listener mode on makes you available straight away unless you say otherwise
-  if (update.role === 'listener' && update.isAvailable === undefined && user.isModified('role')) {
-    user.isAvailable = true;
+  await user.save();
+  return user;
+}
+
+/**
+ * The choice on the first screen after signup ("I want to talk" / "I want to be a
+ * listener"), or "continue as a normal user" after a listener application.
+ */
+export async function setSignupIntent(user: UserDoc, intent: 'user' | 'listener'): Promise<UserDoc> {
+  if (isListener(user)) throw ApiError.badRequest('You are already a listener.');
+  if (intent === 'listener') {
+    if (user.profileComplete && user.signupIntent === 'user') {
+      throw ApiError.badRequest('Apply from your profile to become a listener.');
+    }
+    user.signupIntent = 'listener';
+  } else {
+    user.signupIntent = 'user';
+    // Choosing to be a normal user withdraws a pending application
+    if (user.listenerStatus === 'pending') user.listenerStatus = 'none';
   }
   await user.save();
   return user;
 }
 
-/** Asks to join the listener programme. Admins review it in the admin panel. */
-export async function applyAsListener(user: UserDoc, about: string): Promise<UserDoc> {
-  if (!user.profileComplete) throw ApiError.badRequest('Complete your profile before applying.');
-  if (user.listenerStatus === 'approved') throw ApiError.badRequest('You are already an approved listener.');
-  if (user.listenerStatus === 'pending') throw ApiError.conflict('Your application is already being reviewed.');
+// ---------- Listener applications ----------
 
-  if (!env.LISTENER_APPROVAL_REQUIRED) {
-    user.set({ listenerStatus: 'approved', role: 'listener', isAvailable: true, 'listenerApplication.about': about });
-  } else {
-    user.set({
-      listenerStatus: 'pending',
-      listenerApplication: { about: about.trim(), appliedAt: new Date(), reviewedAt: null, reviewedBy: null, note: null },
-    });
+const VOICE_FORMATS: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/m4a': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/aac': 'aac',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+};
+/** Allow a little slack: recorders on different phones round the length differently */
+const DURATION_SLACK_SEC = 2;
+
+function assertCanEditApplication(user: UserDoc) {
+  if (isListener(user)) throw ApiError.badRequest('You are already an approved listener.');
+}
+
+/** Saves (or replaces) the applicant's voice intro recording */
+export async function uploadVoiceIntro(user: UserDoc, data: Buffer, contentType: string, durationSec: number) {
+  assertCanEditApplication(user);
+  const extension = VOICE_FORMATS[contentType.split(';')[0].trim().toLowerCase()];
+  if (!extension) throw ApiError.badRequest('Unsupported audio format. Please record again.');
+  if (data.length < 1024) throw ApiError.badRequest('The recording is empty. Please record again.');
+  if (
+    !Number.isFinite(durationSec) ||
+    durationSec < env.VOICE_INTRO_MIN_SEC - DURATION_SLACK_SEC ||
+    durationSec > env.VOICE_INTRO_MAX_SEC + DURATION_SLACK_SEC
+  ) {
+    throw ApiError.badRequest(`Your voice intro must be ${env.VOICE_INTRO_MIN_SEC}–${env.VOICE_INTRO_MAX_SEC} seconds long.`);
   }
+
+  const key = `voice-intro_${user.id}_${Date.now()}.${extension}`;
+  await storage.put(key, data, contentType);
+  const previous = user.listenerApplication?.voiceIntroKey;
+  user.set({ 'listenerApplication.voiceIntroKey': key, 'listenerApplication.voiceIntroDurationSec': Math.round(durationSec) });
+  await user.save();
+  if (previous) await storage.delete(previous).catch(() => {});
+  return user;
+}
+
+export interface ListenerApplicationInput {
+  fullName: string;
+  /** YYYY-MM-DD */
+  dateOfBirth: string;
+  city: string;
+  about: string;
+}
+
+export function ageOn(dateOfBirth: Date, today = new Date()): number {
+  let age = today.getUTCFullYear() - dateOfBirth.getUTCFullYear();
+  const birthdayPassed =
+    today.getUTCMonth() > dateOfBirth.getUTCMonth() ||
+    (today.getUTCMonth() === dateOfBirth.getUTCMonth() && today.getUTCDate() >= dateOfBirth.getUTCDate());
+  if (!birthdayPassed) age -= 1;
+  return age;
+}
+
+/** Sends (or re-sends after edits or a rejection) the application for admin review */
+export async function submitListenerApplication(user: UserDoc, input: ListenerApplicationInput) {
+  assertCanEditApplication(user);
+  if (!user.name || !user.gender || user.languages.length === 0) {
+    throw ApiError.badRequest('Add your nickname, gender and languages first.');
+  }
+  if (!user.listenerApplication?.voiceIntroKey) throw ApiError.badRequest('Record your voice intro first.');
+
+  const dateOfBirth = new Date(`${input.dateOfBirth}T00:00:00Z`);
+  const age = ageOn(dateOfBirth);
+  if (Number.isNaN(age) || age > 100) throw ApiError.badRequest('Enter a valid date of birth.');
+  if (age < MIN_AGE) throw ApiError.badRequest(`Listeners must be ${MIN_AGE} or older.`);
+
+  user.set({
+    age,
+    listenerStatus: 'pending',
+    'listenerApplication.fullName': input.fullName.trim(),
+    'listenerApplication.dateOfBirth': dateOfBirth,
+    'listenerApplication.city': input.city.trim(),
+    'listenerApplication.about': input.about.trim(),
+    'listenerApplication.appliedAt': new Date(),
+    'listenerApplication.reviewedAt': null,
+    'listenerApplication.reviewedBy': null,
+    'listenerApplication.note': null,
+  });
   await user.save();
   return user;
 }
@@ -115,21 +204,24 @@ export interface UserFilters {
   limit: number;
 }
 
+/** Users browse listeners (the only people they can call) */
 export async function listUsers(me: UserDoc, filters: UserFilters) {
+  assertActsAsUser(me, 'browse listeners');
   const blocked = await getBlockedIds(me._id);
   const query: Record<string, unknown> = {
     _id: { $nin: [me._id, ...blocked] },
     status: 'active',
     profileComplete: true,
+    role: 'listener',
+    listenerStatus: 'approved',
   };
-  if (filters.listenersOnly) query.role = 'listener';
   if (filters.onlineOnly) query.isOnline = true;
   if (filters.language) query.languages = filters.language;
   if (filters.gender) query.gender = filters.gender;
 
   const users = await User.find(query)
-    // Online first, then listeners ('listener' < 'user'), then best rated
-    .sort({ isOnline: -1, role: 1, rating: -1, _id: 1 })
+    // Online and available first, then best rated
+    .sort({ isOnline: -1, isAvailable: -1, rating: -1, _id: 1 })
     .skip((filters.page - 1) * filters.limit)
     .limit(filters.limit);
   return users.map(toPublicUser);

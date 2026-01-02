@@ -29,8 +29,11 @@ export interface ServerToClientEvents {
   'account:updated': (payload: { reason: 'listener_approved' | 'listener_rejected' | 'listener_revoked' }) => void;
   'call:incoming': (payload: { callId: string; from: PublicUser; expiresAt: string }) => void;
   'call:accepted': (payload: { callId: string; voice: VoiceCredentials | null }) => void;
-  'call:ended': (payload: { callId: string; reason: CallEndReason; durationSec: number; coins: number }) => void;
+  /** coins = what the caller spent; earnedPaise = what the listener earned */
+  'call:ended': (payload: { callId: string; reason: CallEndReason; durationSec: number; coins: number; earnedPaise: number }) => void;
   'wallet:balance': (payload: { balance: number }) => void;
+  /** Listener earnings balance changed */
+  'earnings:balance': (payload: { balancePaise: number }) => void;
   'room:updated': (payload: { room: RoomDto }) => void;
   /** Fresh voice credentials after your room role changed (speaker ↔ listener) */
   'room:voice': (payload: { roomId: string; voice: VoiceCredentials | null }) => void;

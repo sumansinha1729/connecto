@@ -5,9 +5,11 @@ import { RoomCard } from '@/components/rooms/RoomCard';
 import { Button, EmptyState, LoadingView, Screen, Text } from '@/components/ui';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { api } from '@/services';
+import { selectIsListener, useAuthStore } from '@/store/authStore';
 import { colors, spacing } from '@/theme';
 
 export default function RoomsScreen() {
+  const isListener = useAuthStore(selectIsListener);
   const { data: rooms, loading, refreshing, error, refresh } = useAsyncData(() => api.rooms.listRooms(), [], {
     refetchOnFocus: true,
   });
@@ -22,7 +24,7 @@ export default function RoomsScreen() {
           <View style={styles.header}>
             <Text variant="title">Voice rooms</Text>
             <Text variant="body" color="muted">
-              Drop in, listen, and raise your hand to speak.
+              {isListener ? 'Host a room or drop into one.' : 'Drop in, listen, and raise your hand to speak.'}
             </Text>
           </View>
         }
@@ -40,9 +42,11 @@ export default function RoomsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       />
-      <View style={styles.fab}>
-        <Button title="Start a room" icon="add" onPress={() => router.push('/room/create')} />
-      </View>
+      {isListener && (
+        <View style={styles.fab}>
+          <Button title="Start a room" icon="add" onPress={() => router.push('/room/create')} />
+        </View>
+      )}
     </Screen>
   );
 }

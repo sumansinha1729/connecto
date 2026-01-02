@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -9,6 +8,7 @@ import { colors, radius, spacing } from '@/theme';
 import { notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
 import { formatCoins } from '@/utils/format';
+import { goBack } from '@/utils/navigation';
 
 export default function RechargeScreen() {
   const balance = useWalletStore((s) => s.balance);
@@ -22,7 +22,7 @@ export default function RechargeScreen() {
     try {
       await recharge(selected.id);
       notify('Recharge successful', `${formatCoins(selected.coins + selected.bonus)} coins were added to your wallet.`);
-      router.back();
+      goBack();
     } catch (e) {
       notify('Payment failed', getErrorMessage(e));
       setPaying(false);

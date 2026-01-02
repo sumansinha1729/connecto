@@ -4,7 +4,6 @@ import { StyleSheet, Switch, View } from 'react-native';
 
 import { ListenerBadge } from '@/components/users/ListenerBadge';
 import { Avatar, Button, Card, ListRow, Screen, Text } from '@/components/ui';
-import { api } from '@/services';
 import { useAuthStore } from '@/store/authStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors, spacing } from '@/theme';
@@ -21,7 +20,7 @@ export default function ProfileScreen() {
   const [busy, setBusy] = useState(false);
 
   if (!me) return null;
-  const isListener = me.role === 'listener';
+  const isListener = me.role === 'listener' && me.listenerStatus === 'approved';
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -34,18 +33,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const toggleListener = async (enable: boolean) => {
-    if (enable) {
-      const ok = await confirm({
-        title: 'Become a listener?',
-        message: 'Listeners take calls from people who need someone to talk to, and earn coins for every minute.',
-        confirmText: 'Become a listener',
-      });
-      if (!ok) return;
-    }
-    run(() => updateProfile({ role: enable ? 'listener' : 'user', isAvailable: enable }));
-  };
-
   const onDelete = async () => {
     const ok = await confirm({
       title: 'Delete account?',
@@ -55,11 +42,6 @@ export default function ProfileScreen() {
     });
     if (ok) run(deleteAccount);
   };
-
-  const simulateIncoming = () =>
-    run(async () => {
-      await api.calls.simulateIncomingCall();
-    });
 
   return (
     <Screen scroll edges={['top']}>
@@ -78,54 +60,63 @@ export default function ProfileScreen() {
         <Button title="Edit profile" icon="create-outline" variant="secondary" size="sm" onPress={() => router.push('/edit-profile')} />
       </View>
 
-      <Text variant="label" color="muted" style={styles.sectionTitle}>
-        Listener mode
-      </Text>
-      <Card style={styles.group}>
-        <ListRow
-          icon="ribbon"
-          label="I’m a listener"
-          right={
-            <Switch
-              value={isListener}
-              onValueChange={toggleListener}
-              disabled={busy}
-              trackColor={{ true: colors.primary, false: colors.border }}
-              thumbColor={colors.white}
+      {isListener ? (
+        <>
+          <Text variant="label" color="muted" style={styles.sectionTitle}>
+            Listener
+          </Text>
+          <Card style={styles.group}>
+            <ListRow
+              icon="radio-button-on"
+              label="Available for calls"
+              right={
+                <Switch
+                  value={me.isAvailable}
+                  onValueChange={(isAvailable) => run(() => updateProfile({ isAvailable }))}
+                  disabled={busy}
+                  trackColor={{ true: colors.success, false: colors.border }}
+                  thumbColor={colors.white}
+                />
+              }
             />
-          }
-        />
-        {isListener && (
-          <ListRow
-            icon="radio-button-on"
-            label="Available for calls"
-            right={
-              <Switch
-                value={me.isAvailable}
-                onValueChange={(isAvailable) => run(() => updateProfile({ isAvailable }))}
-                disabled={busy}
-                trackColor={{ true: colors.success, false: colors.border }}
-                thumbColor={colors.white}
+            <ListRow icon="cash" label="Earnings" onPress={() => router.push('/earnings')} />
+            <ListRow icon="card" label="Payout details" value={me.payoutMethodLabel ?? 'Not added'} onPress={() => router.push('/payout-method')} />
+          </Card>
+        </>
+      ) : (
+        <>
+          <Text variant="label" color="muted" style={styles.sectionTitle}>
+            Listener programme
+          </Text>
+          <Card style={styles.group}>
+            {me.listenerStatus === 'pending' ? (
+              <ListRow icon="hourglass-outline" label="Your application" value="Under review" onPress={() => router.push('/listener-apply')} />
+            ) : (
+              <ListRow
+                icon="ribbon"
+                label="Become a listener"
+                value={me.listenerStatus === 'rejected' ? 'Not approved · apply again' : 'Earn by listening'}
+                onPress={() => router.push('/listener-apply')}
               />
-            }
-          />
-        )}
-      </Card>
+            )}
+          </Card>
+          {me.listenerStatus === 'rejected' && me.listenerApplication.note && (
+            <Text variant="caption" color="muted" style={styles.note}>
+              Reason: {me.listenerApplication.note}
+            </Text>
+          )}
+        </>
+      )}
 
       <Text variant="label" color="muted" style={styles.sectionTitle}>
         Account
       </Text>
       <Card style={styles.group}>
-        <ListRow icon="wallet" label="Wallet" value={`${formatCoins(balance)} coins`} onPress={() => router.push('/wallet')} />
+        {!isListener && (
+          <ListRow icon="wallet" label="Wallet" value={`${formatCoins(balance)} coins`} onPress={() => router.push('/wallet')} />
+        )}
         <ListRow icon="heart" label="Favourites" onPress={() => router.push('/favorites')} />
         <ListRow icon="ban" label="Blocked users" onPress={() => router.push('/blocked')} />
-      </Card>
-
-      <Text variant="label" color="muted" style={styles.sectionTitle}>
-        Developer
-      </Text>
-      <Card style={styles.group}>
-        <ListRow icon="call" label="Simulate incoming call" onPress={simulateIncoming} />
       </Card>
 
       <Card style={[styles.group, styles.lastGroup]}>
@@ -142,4 +133,5 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: spacing.lg, marginBottom: spacing.sm, marginLeft: spacing.xs },
   group: { padding: spacing.xs },
   lastGroup: { marginTop: spacing.xl },
+  note: { marginTop: spacing.sm, marginLeft: spacing.xs },
 });

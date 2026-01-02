@@ -10,7 +10,9 @@ import { User, type UserDoc } from '../users/user.model';
 import { toPublicUser } from '../users/user.serializer';
 import { getBlockedIds, isBlockedEitherWay } from '../users/users.service';
 import { voiceCredentials } from '../voice/agora';
-import { creditIntoEntry, debitIntoEntry, getBalance } from '../wallet/wallet.service';
+import { creditCallMinute } from '../earnings/earnings.service';
+import { assertActsAsUser, isListener } from '../users/accountRules';
+import { debitIntoEntry, getBalance } from '../wallet/wallet.service';
 import { Call, FINAL_STATUSES, type CallDoc, type EndReason, type FinalStatus } from './call.model';
 
 /*
@@ -23,7 +25,8 @@ import { Call, FINAL_STATUSES, type CallDoc, type EndReason, type FinalStatus } 
  *                    └── no answer in CALL_RING_TIMEOUT_SEC ──▶ missed
  *
  * Billing: the caller is charged CALL_RATE_COINS_PER_MIN at pickup and then at the
- * start of every minute. A listener callee earns LISTENER_SHARE_PERCENT of it.
+ * start of every minute; the listener earns LISTENER_EARNING_PAISE_PER_MIN (₹) into a
+ * separate earnings wallet. Only users call, and only listeners can be called.
  */
 
 // ---------- Timers (ring timeout + billing) for calls on this server ----------
@@ -64,14 +67,16 @@ async function releaseUser(userId: Types.ObjectId, callId: Types.ObjectId) {
 // ---------- Starting, answering, ending ----------
 
 const isReachable = (user: UserDoc) =>
-  user.status === 'active' && isUserConnected(user.id) && (user.role !== 'listener' || user.isAvailable);
+  user.status === 'active' && isListener(user) && user.isAvailable && isUserConnected(user.id);
 
 export async function startCall(caller: UserDoc, calleeId: string) {
   if (caller.id === calleeId) throw ApiError.badRequest('You can’t call yourself.');
+  assertActsAsUser(caller, 'start calls');
   if (!caller.profileComplete) throw ApiError.badRequest('Complete your profile before making calls.');
 
   const callee = await User.findOne({ _id: calleeId, status: 'active', profileComplete: true });
   if (!callee) throw ApiError.notFound('This user is not available.');
+  if (!isListener(callee)) throw ApiError.forbidden('You can only call listeners.');
   if (await isBlockedEitherWay(caller._id, callee._id)) throw new ApiError(403, 'BLOCKED', 'You can’t call this user.');
   if (!isReachable(callee)) {
     throw new ApiError(409, 'USER_UNAVAILABLE', `${callee.name} is not available right now. Try again later.`);
@@ -176,15 +181,16 @@ async function finishCall(callId: string, status: FinalStatus, reason: EndReason
     await User.updateMany({ _id: { $in: [call.callerId, call.calleeId] } }, { $inc: { totalCalls: 1 } });
   }
 
-  for (const [userId, coins] of [
-    [call.callerId, call.coinsCharged],
-    [call.calleeId, call.coinsEarned],
+  for (const [userId, coins, earnedPaise] of [
+    [call.callerId, call.coinsCharged, 0],
+    [call.calleeId, 0, call.earnedPaise],
   ] as const) {
     emitToUser(String(userId), 'call:ended', {
       callId: call.id,
       reason: reasonFor(userId, reason, call.endedBy),
       durationSec: call.durationSec,
       coins,
+      earnedPaise,
     });
   }
 }
@@ -232,18 +238,9 @@ async function billMinute(callId: string, minute: number): Promise<boolean> {
     throw error;
   }
 
-  const earning = Math.floor((rate * env.LISTENER_SHARE_PERCENT) / 100);
-  if (callee?.role === 'listener' && earning > 0) {
-    const balance = await creditIntoEntry({
-      userId: call.calleeId,
-      amount: earning,
-      type: 'call_earning',
-      entryKey: `call:${call.id}:earning`,
-      description: `Call with ${caller?.name ?? 'user'} · ${minute} min`,
-      meta: { callId: call.id },
-    });
-    await Call.updateOne({ _id: call._id }, { $inc: { coinsEarned: earning } });
-    emitToUser(String(call.calleeId), 'wallet:balance', { balance });
+  if (callee && isListener(callee)) {
+    const earned = await creditCallMinute(call.calleeId, call.id, caller?.name ?? 'user', minute);
+    if (earned > 0) await Call.updateOne({ _id: call._id }, { $inc: { earnedPaise: earned } });
   }
   return true;
 }
@@ -259,7 +256,8 @@ function toHistoryItem(call: CallDoc, me: UserDoc, peer: UserDoc) {
     status: call.status as FinalStatus,
     startedAt: call.createdAt.toISOString(),
     durationSec: call.durationSec,
-    coins: outgoing ? call.coinsCharged : call.coinsEarned,
+    coins: outgoing ? call.coinsCharged : 0,
+    earnedPaise: outgoing ? 0 : call.earnedPaise,
     rating: call.ratings.find((r) => r.userId.equals(me._id))?.stars ?? null,
   };
 }
@@ -323,12 +321,14 @@ export async function rateCall(me: UserDoc, callId: string, stars: number) {
 
 /** A random free listener, preferring one who speaks `language` */
 export async function findMatch(me: UserDoc, language?: string) {
+  assertActsAsUser(me, 'start calls');
   const blocked = await getBlockedIds(me._id);
   const base = {
     _id: { $nin: [me._id, ...blocked] },
     status: 'active',
     profileComplete: true,
     role: 'listener',
+    listenerStatus: 'approved',
     isAvailable: true,
     isOnline: true,
     activeCallId: null,

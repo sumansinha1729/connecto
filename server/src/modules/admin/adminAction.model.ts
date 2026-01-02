@@ -9,6 +9,8 @@ export const ADMIN_ACTIONS = [
   'resolve_report',
   'adjust_wallet',
   'end_room',
+  'mark_payout_paid',
+  'reject_payout',
 ] as const;
 export type AdminActionType = (typeof ADMIN_ACTIONS)[number];
 

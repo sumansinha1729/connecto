@@ -1,5 +1,11 @@
+/** Same codes as server/src/utils/ApiError.ts, plus NETWORK for "server unreachable" */
 export type ApiErrorCode =
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'CONFLICT'
+  | 'RATE_LIMITED'
+  | 'INTERNAL'
+  | 'NETWORK'
   | 'INVALID_PHONE'
   | 'INVALID_OTP'
   | 'NOT_FOUND'

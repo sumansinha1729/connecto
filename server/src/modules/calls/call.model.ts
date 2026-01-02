@@ -23,7 +23,8 @@ const callSchema = new Schema(
     /** Minutes charged so far; also guards against billing the same minute twice */
     billedMinutes: { type: Number, default: 0 },
     coinsCharged: { type: Number, default: 0 },
-    coinsEarned: { type: Number, default: 0 },
+    /** What the listener earned from this call, in paise */
+    earnedPaise: { type: Number, default: 0 },
     ratings: {
       type: [new Schema({ userId: { type: Types.ObjectId, required: true }, stars: { type: Number, required: true } }, { _id: false })],
       default: [],
