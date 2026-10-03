@@ -1,77 +1,126 @@
-import { StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Avatar, Card, Chip, Icon, Text } from '@/components/ui';
-import { colors, spacing } from '@/theme';
+import { Avatar, Icon, Text } from '@/components/ui';
+import { roomTheme } from '@/constants/roomThemes';
+import { colors, radius, spacing } from '@/theme';
 import type { Room } from '@/types';
+import { liveFor } from './roomActions';
+
+/** A room with this many people gets a "Trending" badge */
+const TRENDING_AT = 10;
 
 interface RoomCardProps {
   room: Room;
+  /** You're in this room right now */
+  joined?: boolean;
   onPress: () => void;
 }
 
-export function RoomCard({ room, onPress }: RoomCardProps) {
+export function RoomCard({ room, joined, onPress }: RoomCardProps) {
+  const theme = roomTheme(room.topic);
   const onStage = room.participants.filter((p) => p.role !== 'listener');
-  const listeners = room.participants.length - onStage.length;
+  const audience = room.participants.length - onStage.length;
   const names = onStage.slice(0, 2).map((p) => p.user.name).join(', ');
   const more = onStage.length > 2 ? ` +${onStage.length - 2}` : '';
 
   return (
-    <Card onPress={onPress} style={styles.card}>
-      <View style={styles.tags}>
-        <View style={styles.live}>
-          <View style={styles.liveDot} />
-          <Text variant="caption" style={styles.liveText}>
-            LIVE
-          </Text>
-        </View>
-        <Chip label={room.topic} />
-        <Chip label={room.language} icon="language" />
-      </View>
-
-      <Text variant="heading" numberOfLines={2}>
-        {room.title}
-      </Text>
-
-      <View style={styles.footer}>
-        <View style={styles.avatars}>
-          {onStage.slice(0, 4).map((p, i) => (
-            <View key={p.user.id} style={[styles.avatarWrap, { marginLeft: i === 0 ? 0 : -12, zIndex: 10 - i }]}>
-              <Avatar avatar={p.user.avatar} size={32} />
+    <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.85 }]} accessibilityRole="button">
+      <LinearGradient colors={theme.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, joined && { borderColor: theme.accent }]}>
+        <View style={styles.topRow}>
+          <View style={styles.live}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE</Text>
+          </View>
+          {room.participants.length >= TRENDING_AT && (
+            <View style={[styles.pill, { backgroundColor: 'rgba(251, 146, 60, 0.18)' }]}>
+              <Text style={[styles.pillText, { color: '#FDBA74' }]}>🔥 Trending</Text>
             </View>
-          ))}
+          )}
+          {joined && (
+            <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+              <Text style={[styles.pillText, { color: theme.accent }]}>You’re here</Text>
+            </View>
+          )}
+          <View style={styles.flex} />
+          <Text style={styles.emoji}>{theme.emoji}</Text>
         </View>
-        <Text variant="caption" color="muted" numberOfLines={1} style={styles.names}>
-          {names}
-          {more}
-        </Text>
-        <View style={styles.count}>
-          <Icon name="headset" size={14} color={colors.textMuted} />
-          <Text variant="caption" color="muted">
-            {listeners}
+
+        <View style={styles.titles}>
+          <Text variant="heading" numberOfLines={2}>
+            {room.title}
+          </Text>
+          {room.description ? (
+            <Text variant="caption" color="muted" numberOfLines={1}>
+              {room.description}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.stageRow}>
+          <View style={styles.avatars}>
+            {onStage.slice(0, 4).map((p, i) => (
+              <View key={p.user.id} style={[styles.avatarWrap, { marginLeft: i === 0 ? 0 : -10, zIndex: 10 - i }]}>
+                <Avatar avatar={p.user.avatar} size={30} />
+              </View>
+            ))}
+          </View>
+          <Text variant="caption" numberOfLines={1} style={styles.names}>
+            {names}
+            {more}
+            <Text variant="caption" color="muted">
+              {' '}
+              on stage
+            </Text>
           </Text>
         </View>
-      </View>
-    </Card>
+
+        <View style={styles.footer}>
+          <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+            <Text style={[styles.pillText, { color: theme.accent }]}>{room.topic}</Text>
+          </View>
+          <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+            <Text style={[styles.pillText, { color: colors.textMuted }]}>{room.language}</Text>
+          </View>
+          <View style={styles.flex} />
+          <Icon name="headset" size={13} color={colors.textMuted} />
+          <Text variant="caption" color="muted">
+            {audience} · {liveFor(room.createdAt)}
+          </Text>
+        </View>
+      </LinearGradient>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.md },
-  tags: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  card: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   live: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
     backgroundColor: colors.dangerSoft,
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.danger },
-  liveText: { color: colors.danger, fontWeight: '800', fontSize: 11 },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  liveText: { color: colors.danger, fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
+  pill: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: 999 },
+  pillText: { fontSize: 11, fontWeight: '700' },
+  emoji: { fontSize: 26 },
+  titles: { gap: 2 },
+  stageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatars: { flexDirection: 'row' },
-  avatarWrap: { borderRadius: 18, borderWidth: 2, borderColor: colors.surface },
-  names: { flex: 1 },
-  count: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  avatarWrap: { borderRadius: 17, borderWidth: 2, borderColor: 'rgba(0,0,0,0.35)' },
+  names: { flex: 1, fontWeight: '600' },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  flex: { flex: 1 },
 });

@@ -6,18 +6,24 @@ import { realtime, type ServerEvents } from '../realtime';
 import { session } from '../session';
 import { refreshTokens } from './client';
 
-const FORWARDED_EVENTS: (keyof ServerEvents)[] = [
-  'call:incoming',
-  'call:accepted',
-  'call:ended',
-  'wallet:balance',
-  'earnings:balance',
-  'room:updated',
-  'room:voice',
-  'room:closed',
-  'room:removed',
-  'account:updated',
-];
+/** Every server event, forwarded to `realtime`. A Record so TypeScript flags any event missing here. */
+const FORWARDED: Record<keyof ServerEvents, true> = {
+  'call:incoming': true,
+  'call:accepted': true,
+  'call:ended': true,
+  'wallet:balance': true,
+  'earnings:balance': true,
+  'room:updated': true,
+  'room:voice': true,
+  'room:message': true,
+  'room:message-deleted': true,
+  'room:reaction': true,
+  'room:muted': true,
+  'room:closed': true,
+  'room:removed': true,
+  'account:updated': true,
+};
+const FORWARDED_EVENTS = Object.keys(FORWARDED) as (keyof ServerEvents)[];
 
 let socket: Socket | null = null;
 

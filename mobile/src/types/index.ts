@@ -116,7 +116,8 @@ export interface CallRecord {
 
 // ---------- Rooms ----------
 
-export type RoomRole = 'host' | 'speaker' | 'listener';
+/** host owns the room · cohost helps moderate and takes over if the host leaves · speaker · listener (audience) */
+export type RoomRole = 'host' | 'cohost' | 'speaker' | 'listener';
 
 export interface RoomParticipant {
   user: User;
@@ -132,7 +133,10 @@ export interface Room {
   title: string;
   topic: string;
   language: string;
+  /** Welcome message / room rules, pinned at the top */
+  description: string;
   hostId: string;
+  /** Host first, then co-hosts, speakers, audience */
   participants: RoomParticipant[];
   createdAt: string;
 }
@@ -141,7 +145,22 @@ export interface CreateRoomInput {
   title: string;
   topic: string;
   language: string;
+  /** Welcome message / room rules */
+  description?: string;
 }
+
+export interface RoomMessage {
+  id: string;
+  /** chat: a message · join: "X joined" · system: e.g. "X is now the host" */
+  kind: 'chat' | 'join' | 'system';
+  text: string;
+  user: { id: string; name: string; avatar: string } | null;
+  createdAt: string;
+}
+
+/** Same list as the server (rooms.service REACTIONS) */
+export const ROOM_REACTIONS = ['❤️', '😂', '👏', '🙏', '🔥', '😮'] as const;
+export type RoomReaction = (typeof ROOM_REACTIONS)[number];
 
 // ---------- Wallet ----------
 

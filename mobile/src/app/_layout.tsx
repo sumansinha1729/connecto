@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { CallManager } from '@/components/calls/CallManager';
+import { RoomManager } from '@/components/rooms/RoomManager';
 import { DialogHost } from '@/components/ui';
 import { VoiceManager } from '@/components/voice/VoiceManager';
 import { api } from '@/services';
@@ -16,6 +17,7 @@ import {
 } from '@/store/authStore';
 import { bindRealtimeToStores } from '@/store/bindings';
 import { useCallStore } from '@/store/callStore';
+import { useRoomStore } from '@/store/roomStore';
 import { useEarningsStore } from '@/store/earningsStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors } from '@/theme';
@@ -69,6 +71,7 @@ export default function RootLayout() {
       useWalletStore.getState().reset();
       useEarningsStore.getState().reset();
       useCallStore.getState().reset();
+      useRoomStore.getState().reset();
     }
   }, [hydrated, isLoggedIn, isAdmin]);
 
@@ -126,6 +129,7 @@ export default function RootLayout() {
       </Stack>
       {inApp && <CallManager />}
       {inApp && <VoiceManager />}
+      {inApp && <RoomManager />}
       <DialogHost />
     </ThemeProvider>
   );

@@ -2,7 +2,7 @@
  * Server → client realtime events, forwarded from Socket.IO (see http/socket.ts).
  * Mirrors server/src/realtime/events.ts.
  */
-import type { CallEndReason, Room, User, VoiceCredentials } from '@/types';
+import type { CallEndReason, Room, RoomMessage, User, VoiceCredentials } from '@/types';
 
 export interface ServerEvents {
   'call:incoming': { callId: string; from: User; expiresAt?: string };
@@ -21,6 +21,12 @@ export interface ServerEvents {
   'room:updated': { room: Room };
   /** New voice credentials after your room role changed */
   'room:voice': { roomId: string; voice: VoiceCredentials | null };
+  'room:message': { roomId: string; message: RoomMessage };
+  'room:message-deleted': { roomId: string; messageId: string };
+  /** Someone tapped an emoji reaction */
+  'room:reaction': { roomId: string; userId: string; emoji: string };
+  /** The host or a co-host muted you */
+  'room:muted': { roomId: string; by: string };
   'room:closed': { roomId: string };
   'room:removed': { roomId: string };
   /** Your account changed on the server (e.g. listener application reviewed) */

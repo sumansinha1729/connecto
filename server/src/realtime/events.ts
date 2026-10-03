@@ -2,7 +2,7 @@
  * Server → client socket events. Actions go over REST; the socket only pushes
  * updates. Mirrors `ServerEvents` in mobile/src/services/realtime.ts.
  */
-import type { RoomDto } from '../modules/rooms/rooms.service';
+import type { RoomDto, RoomMessageDto } from '../modules/rooms/rooms.service';
 import type { PublicUser } from '../modules/users/user.serializer';
 
 /** What the app needs to join an Agora voice channel. Null when Agora isn't configured. */
@@ -39,6 +39,13 @@ export interface ServerToClientEvents {
   'room:updated': (payload: { room: RoomDto }) => void;
   /** Fresh voice credentials after your room role changed (speaker ↔ listener) */
   'room:voice': (payload: { roomId: string; voice: VoiceCredentials | null }) => void;
+  /** Chat message, "X joined", or a system note like "X is now the host" */
+  'room:message': (payload: { roomId: string; message: RoomMessageDto }) => void;
+  'room:message-deleted': (payload: { roomId: string; messageId: string }) => void;
+  /** Someone tapped an emoji reaction (not stored) */
+  'room:reaction': (payload: { roomId: string; userId: string; emoji: string }) => void;
+  /** The host or a co-host muted you */
+  'room:muted': (payload: { roomId: string; by: string }) => void;
   'room:closed': (payload: { roomId: string }) => void;
   'room:removed': (payload: { roomId: string }) => void;
 }

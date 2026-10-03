@@ -1,7 +1,17 @@
 /** Real backend implementation of the service contracts (server/ in this repo). */
 import type { Api } from '../contracts';
 import { session } from '../session';
-import type { AuthTokens, CallRecord, EarningsSummary, Me, Room, Transaction, User, VoiceCredentials } from '@/types';
+import type {
+  AuthTokens,
+  CallRecord,
+  EarningsSummary,
+  Me,
+  Room,
+  RoomMessage,
+  Transaction,
+  User,
+  VoiceCredentials,
+} from '@/types';
 import { http } from './client';
 import { socketConnection } from './socket';
 
@@ -100,13 +110,18 @@ export const httpApi: Api = {
   rooms: {
     listRooms: async () => (await http.get<{ rooms: Room[] }>('/rooms')).rooms,
     createRoom: async (input) => (await http.post<{ room: Room }>('/rooms', input)).room,
-    joinRoom: (roomId) => http.post<{ room: Room; voice: VoiceCredentials | null }>(`/rooms/${roomId}/join`),
+    joinRoom: (roomId) => http.post<{ room: Room; voice: VoiceCredentials | null; messages: RoomMessage[] }>(`/rooms/${roomId}/join`),
+    updateRoom: (roomId, input) => http.patch(`/rooms/${roomId}`, input),
     leaveRoom: (roomId) => http.post(`/rooms/${roomId}/leave`),
     getVoice: async (roomId) => (await http.get<{ voice: VoiceCredentials | null }>(`/rooms/${roomId}/voice`)).voice,
     setHandRaised: (roomId, raised) => http.post(`/rooms/${roomId}/hand`, { raised }),
     setMuted: (roomId, muted) => http.post(`/rooms/${roomId}/mute`, { muted }),
     setRole: (roomId, userId, role) => http.put(`/rooms/${roomId}/participants/${userId}/role`, { role }),
+    muteParticipant: (roomId, userId) => http.post(`/rooms/${roomId}/participants/${userId}/mute`),
     removeParticipant: (roomId, userId) => http.delete(`/rooms/${roomId}/participants/${userId}`),
+    sendMessage: async (roomId, text) => (await http.post<{ message: RoomMessage }>(`/rooms/${roomId}/messages`, { text })).message,
+    deleteMessage: (roomId, messageId) => http.delete(`/rooms/${roomId}/messages/${messageId}`),
+    react: (roomId, emoji) => http.post(`/rooms/${roomId}/reactions`, { emoji }),
   },
 
   connection: socketConnection,

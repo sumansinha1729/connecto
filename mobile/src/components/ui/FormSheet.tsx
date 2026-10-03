@@ -15,6 +15,9 @@ export interface FormField {
   multiline?: boolean;
   /** Minimum trimmed length before the form can be submitted (default 1) */
   minLength?: number;
+  maxLength?: number;
+  /** Pre-filled value, e.g. when editing */
+  initialValue?: string;
 }
 
 interface FormSheetProps {
@@ -37,7 +40,7 @@ export function FormSheet({ visible, title, message, fields, submitLabel, destru
 
   useEffect(() => {
     if (visible) {
-      setValues({});
+      setValues(Object.fromEntries(fields.map((f) => [f.key, f.initialValue ?? ''])));
       setError(null);
       setBusy(false);
     }
@@ -75,6 +78,7 @@ export function FormSheet({ visible, title, message, fields, submitLabel, destru
               placeholder={field.placeholder}
               keyboardType={field.keyboardType}
               multiline={field.multiline}
+              maxLength={field.maxLength}
               value={values[field.key] ?? ''}
               onChangeText={(text) => setValues((v) => ({ ...v, [field.key]: text }))}
               autoFocus={i === 0}

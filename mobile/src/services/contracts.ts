@@ -13,6 +13,8 @@ import type {
   ProfileUpdate,
   ReportReason,
   Room,
+  RoomMessage,
+  RoomReaction,
   RoomRole,
   User,
   UserFilters,
@@ -77,16 +79,25 @@ export interface EarningsService {
 export interface RoomService {
   listRooms(): Promise<Room[]>;
   createRoom(input: CreateRoomInput): Promise<Room>;
-  joinRoom(roomId: string): Promise<{ room: Room; voice: VoiceCredentials | null }>;
+  /** Also returns the recent chat */
+  joinRoom(roomId: string): Promise<{ room: Room; voice: VoiceCredentials | null; messages: RoomMessage[] }>;
+  /** Host or co-host: change the title or the welcome message */
+  updateRoom(roomId: string, input: { title?: string; description?: string }): Promise<void>;
   leaveRoom(roomId: string): Promise<void>;
   /** Fresh voice credentials for your current role (voice tokens are short-lived) */
   getVoice(roomId: string): Promise<VoiceCredentials | null>;
   setHandRaised(roomId: string, raised: boolean): Promise<void>;
   setMuted(roomId: string, muted: boolean): Promise<void>;
-  /** Host only */
+  /** Host or co-host (only the host can make co-hosts) */
   setRole(roomId: string, userId: string, role: Exclude<RoomRole, 'host'>): Promise<void>;
-  /** Host only */
+  /** Host or co-host: mute someone on stage */
+  muteParticipant(roomId: string, userId: string): Promise<void>;
+  /** Host or co-host */
   removeParticipant(roomId: string, userId: string): Promise<void>;
+  sendMessage(roomId: string, text: string): Promise<RoomMessage>;
+  /** Your own message, or anyone's for the host / co-hosts */
+  deleteMessage(roomId: string, messageId: string): Promise<void>;
+  react(roomId: string, emoji: RoomReaction): Promise<void>;
 }
 
 /** Live connection for server → client events */
