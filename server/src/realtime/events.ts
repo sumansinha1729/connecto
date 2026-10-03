@@ -12,6 +12,8 @@ export interface VoiceCredentials {
   token: string;
   uid: number;
   expiresInSec: number;
+  /** Publisher (can talk) or listen-only. The app follows this, not the room role, so the two can't disagree. */
+  canSpeak: boolean;
 }
 
 /** Reasons are worded from the receiving user's point of view */

@@ -1,7 +1,10 @@
 type Level = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVELS: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
-const minLevel: Level = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
+
+// Read directly (not from config/env) so the logger works even while the config is being validated
+const configured = process.env.LOG_LEVEL as Level | undefined;
+const minLevel: Level = configured && configured in LEVELS ? configured : process.env.NODE_ENV === 'production' ? 'info' : 'debug';
 
 function write(level: Level, message: string, meta?: unknown) {
   if (LEVELS[level] < LEVELS[minLevel]) return;

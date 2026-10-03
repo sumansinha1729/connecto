@@ -39,6 +39,11 @@ const userCard = (user: UserDoc | undefined) =>
 
 // ---------- Users ----------
 
+/** Grants or removes admin rights (used by `npm run make-admin`). Returns null if nobody has that phone. */
+export async function setAdminByPhone(phone: string, isAdmin: boolean): Promise<UserDoc | null> {
+  return User.findOneAndUpdate({ phone }, { isAdmin }, { returnDocument: 'after' });
+}
+
 export interface UserSearch extends Page {
   q?: string;
   status?: string;

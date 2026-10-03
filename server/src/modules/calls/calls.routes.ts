@@ -5,7 +5,17 @@ import { LANGUAGES } from '../../config/options';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { idParams, objectId } from '../../utils/validators';
-import { acceptCall, endCall, findMatch, getActiveCall, getHistory, rateCall, rejectCall, startCall } from './calls.service';
+import {
+  acceptCall,
+  endCall,
+  findMatch,
+  getActiveCall,
+  getCallVoice,
+  getHistory,
+  rateCall,
+  rejectCall,
+  startCall,
+} from './calls.service';
 
 export const callsRouter = Router();
 callsRouter.use(requireAuth);
@@ -38,6 +48,11 @@ callsRouter.post('/match', validate({ body: z.object({ language: z.enum(LANGUAGE
 
 callsRouter.post('/:id/accept', validate({ params: idParams }), async (req, res) => {
   res.json(await acceptCall(currentUser(req), req.params.id as string));
+});
+
+/** Renewed voice credentials for an active call */
+callsRouter.get('/:id/voice', validate({ params: idParams }), async (req, res) => {
+  res.json({ voice: await getCallVoice(currentUser(req), req.params.id as string) });
 });
 
 callsRouter.post('/:id/reject', validate({ params: idParams }), async (req, res) => {

@@ -8,6 +8,7 @@ import { idParams, objectId } from '../../utils/validators';
 import {
   createRoom,
   getRoom,
+  getRoomVoice,
   joinRoom,
   leaveRoom,
   listRooms,
@@ -42,6 +43,11 @@ roomsRouter.post(
 
 roomsRouter.get('/:id', validate({ params: idParams }), async (req, res) => {
   res.json({ room: await getRoom(currentUser(req), req.params.id as string) });
+});
+
+/** Renewed voice credentials for your current role in the room */
+roomsRouter.get('/:id/voice', validate({ params: idParams }), async (req, res) => {
+  res.json({ voice: await getRoomVoice(currentUser(req), req.params.id as string) });
 });
 
 roomsRouter.post('/:id/join', validate({ params: idParams }), async (req, res) => {

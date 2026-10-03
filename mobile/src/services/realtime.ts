@@ -19,8 +19,6 @@ export interface ServerEvents {
   'wallet:balance': { balance: number };
   'earnings:balance': { balancePaise: number };
   'room:updated': { room: Room };
-  /** Who is talking; filled from Agora's volume indication once real voice is added */
-  'room:speaking': { roomId: string; userIds: string[] };
   /** New voice credentials after your room role changed */
   'room:voice': { roomId: string; voice: VoiceCredentials | null };
   'room:closed': { roomId: string };

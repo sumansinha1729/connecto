@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { findParticipant, useRoomStore } from '@/store/roomStore';
+import { useVoiceStore } from '@/store/voiceStore';
 import { colors, radius, spacing } from '@/theme';
 import type { RoomParticipant } from '@/types';
 import { confirm, notify } from '@/utils/dialog';
@@ -28,7 +29,10 @@ import { goBack } from '@/utils/navigation';
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const meId = useAuthStore((s) => s.user?.id);
-  const { room, speakingIds, exitReason } = useRoomStore();
+  const { room, voice, exitReason } = useRoomStore();
+  const speakingUids = useVoiceStore((s) => s.speakingUids);
+  const voiceStatus = useVoiceStore((s) => s.status);
+  const voiceMessage = useVoiceStore((s) => s.message);
   const actions = useRoomStore.getState();
 
   const [loading, setLoading] = useState(true);
@@ -49,9 +53,10 @@ export default function RoomScreen() {
     };
   }, [id]);
 
-  // The host ended the room, or you were removed
+  // The host ended the room, or you were removed. (Leaving for a call is shown below instead:
+  // going back here would close the call screen on top.)
   useEffect(() => {
-    if (!exitReason) return;
+    if (!exitReason || exitReason === 'call') return;
     notify(exitReason === 'closed' ? 'Room ended' : 'Removed from room', exitReason === 'closed' ? 'The host has ended this room.' : 'The host removed you from this room.');
     goBack();
   }, [exitReason]);
@@ -94,7 +99,13 @@ export default function RoomScreen() {
     return (
       <SafeAreaView style={styles.root}>
         <Header back="close" />
-        {error ? <EmptyState icon="mic-off" title="Can’t join this room" message={error} /> : <LoadingView />}
+        {exitReason === 'call' ? (
+          <EmptyState icon="call" title="You left this room" message="You can only be in one voice chat at a time, so joining your call took you out of the room." />
+        ) : error ? (
+          <EmptyState icon="mic-off" title="Can’t join this room" message={error} />
+        ) : (
+          <LoadingView />
+        )}
       </SafeAreaView>
     );
   }
@@ -156,7 +167,8 @@ export default function RoomScreen() {
             <ParticipantTile
               key={p.user.id}
               participant={p}
-              speaking={speakingIds.includes(p.user.id) || (p.user.id === meId && !p.isMuted)}
+              // Without voice (Agora not set up) an unmuted speaker counts as talking
+              speaking={voice ? speakingUids.includes(p.voiceUid) : p.user.id === meId && !p.isMuted}
               isMe={p.user.id === meId}
               size={72}
               onPress={() => onTilePress(p)}
@@ -203,6 +215,15 @@ export default function RoomScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {(voiceMessage || voiceStatus === 'reconnecting') && (
+        <View style={styles.voiceNotice}>
+          <Icon name={voiceStatus === 'reconnecting' ? 'sync' : 'volume-mute'} size={16} color={colors.warning} />
+          <Text variant="caption" style={styles.voiceNoticeText}>
+            {voiceStatus === 'reconnecting' ? 'Reconnecting audio…' : voiceMessage}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.bottomBar}>
         <Button title={isHost ? 'End room' : 'Leave quietly'} variant="secondary" size="sm" icon="exit-outline" onPress={leave} />
@@ -257,6 +278,17 @@ const styles = StyleSheet.create({
   },
   handRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   handName: { flex: 1 },
+  voiceNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+  },
+  voiceNoticeText: { flex: 1, color: colors.warning },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',

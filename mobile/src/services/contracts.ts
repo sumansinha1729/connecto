@@ -59,6 +59,8 @@ export interface CallService {
   /** Hangs up an active call or cancels a ringing one */
   endCall(callId: string): Promise<void>;
   rateCall(callId: string, stars: number): Promise<void>;
+  /** Fresh voice credentials while the call is on (voice tokens are short-lived) */
+  getVoice(callId: string): Promise<VoiceCredentials | null>;
   getHistory(): Promise<CallRecord[]>;
   /** Finds a random available listener to talk to */
   findMatch(language?: string | null): Promise<User>;
@@ -77,6 +79,8 @@ export interface RoomService {
   createRoom(input: CreateRoomInput): Promise<Room>;
   joinRoom(roomId: string): Promise<{ room: Room; voice: VoiceCredentials | null }>;
   leaveRoom(roomId: string): Promise<void>;
+  /** Fresh voice credentials for your current role (voice tokens are short-lived) */
+  getVoice(roomId: string): Promise<VoiceCredentials | null>;
   setHandRaised(roomId: string, raised: boolean): Promise<void>;
   setMuted(roomId: string, muted: boolean): Promise<void>;
   /** Host only */

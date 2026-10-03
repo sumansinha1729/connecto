@@ -7,7 +7,7 @@
 import mongoose from 'mongoose';
 
 import { env } from '../config/env';
-import { User } from '../modules/users/user.model';
+import { setAdminByPhone } from '../modules/admin/admin.service';
 import { normalizeIndianPhone } from '../utils/phone';
 
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
   const revoke = flag === '--revoke';
 
   await mongoose.connect(env.MONGO_URI);
-  const user = await User.findOneAndUpdate({ phone }, { isAdmin: !revoke }, { returnDocument: 'after' });
+  const user = await setAdminByPhone(phone, !revoke);
   if (!user) {
     console.error(`No user with phone ${phone}. Log in to the app with this number first.`);
     process.exitCode = 1;

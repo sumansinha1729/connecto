@@ -18,7 +18,6 @@ export function bindRealtimeToStores(): () => void {
     ),
 
     realtime.on('room:updated', ({ room }) => useRoomStore.getState().onUpdated(room)),
-    realtime.on('room:speaking', ({ roomId, userIds }) => useRoomStore.getState().onSpeaking(roomId, userIds)),
     realtime.on('room:voice', ({ roomId, voice }) => useRoomStore.getState().onVoice(roomId, voice)),
     realtime.on('room:closed', ({ roomId }) => useRoomStore.getState().onExit(roomId, 'closed')),
     realtime.on('room:removed', ({ roomId }) => useRoomStore.getState().onExit(roomId, 'removed')),

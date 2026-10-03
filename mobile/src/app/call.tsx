@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PulseRings } from '@/components/calls/PulseRings';
@@ -11,6 +11,7 @@ import { ListenerBadge } from '@/components/users/ListenerBadge';
 import { CALL_RATE_PER_MIN } from '@/constants/config';
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds';
 import { isCallActive, useCallStore } from '@/store/callStore';
+import { useVoiceStore } from '@/store/voiceStore';
 import { useWalletStore } from '@/store/walletStore';
 import { colors, gradients, spacing } from '@/theme';
 import type { CallDirection, CallEndReason } from '@/types';
@@ -72,6 +73,7 @@ function ControlButton({
 export default function CallScreen() {
   const call = useCallStore();
   const balance = useWalletStore((s) => s.balance);
+  const voice = useVoiceStore();
   const elapsed = useElapsedSeconds(call.phase === 'connected' ? call.connectedAt : null);
   const [stars, setStars] = useState(0);
 
@@ -115,6 +117,20 @@ export default function CallScreen() {
   const outgoing = call.direction === 'outgoing';
   const lowBalance = phase === 'connected' && outgoing && balance < CALL_RATE_PER_MIN;
 
+  // How the audio is doing, shown under the timer while connected
+  const audioNote =
+    phase !== 'connected'
+      ? null
+      : voice.status === 'reconnecting'
+        ? 'Reconnecting audio…'
+        : voice.message
+          ? voice.message
+          : voice.status === 'connecting'
+            ? 'Connecting audio…'
+            : voice.status === 'connected' && voice.remoteUids.length === 0
+              ? `Waiting for ${peer?.name ?? 'them'} to connect…`
+              : null;
+
   const status =
     phase === 'outgoing'
       ? call.callId
@@ -154,6 +170,14 @@ export default function CallScreen() {
           <Text variant="body" color="muted" center style={phase === 'connected' ? styles.timer : null}>
             {status}
           </Text>
+          {audioNote && (
+            <View style={styles.audioNote}>
+              <Icon name={voice.status === 'connected' && !voice.message ? 'time-outline' : 'volume-mute'} size={14} color={colors.warning} />
+              <Text variant="caption" style={styles.audioNoteText}>
+                {audioNote}
+              </Text>
+            </View>
+          )}
           {phase === 'connected' && outgoing && (
             <Text variant="caption" color="faint">
               {CALL_RATE_PER_MIN} coins/min · Balance {balance}
@@ -256,13 +280,16 @@ export default function CallScreen() {
               <ControlButton label="End" onPress={call.hangup} background={colors.danger} size={72}>
                 <MaterialIcons name="call-end" size={32} color={colors.white} />
               </ControlButton>
-              <ControlButton
-                label="Speaker"
-                onPress={call.toggleSpeaker}
-                background={call.speaker ? colors.white : colors.surfaceAlt}
-              >
-                <Icon name="volume-high" size={26} color={call.speaker ? colors.bg : colors.white} />
-              </ControlButton>
+              {/* Browsers pick the output device themselves */}
+              {Platform.OS !== 'web' && (
+                <ControlButton
+                  label="Speaker"
+                  onPress={call.toggleSpeaker}
+                  background={call.speaker ? colors.white : colors.surfaceAlt}
+                >
+                  <Icon name="volume-high" size={26} color={call.speaker ? colors.bg : colors.white} />
+                </ControlButton>
+              )}
             </View>
           )}
         </View>
@@ -288,6 +315,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
   },
   warningText: { flex: 1, color: colors.warning },
+  audioNote: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 320 },
+  audioNoteText: { color: colors.warning, textAlign: 'center' },
   bottom: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   controls: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start' },
   control: { alignItems: 'center', gap: spacing.sm },

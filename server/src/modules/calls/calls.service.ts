@@ -11,6 +11,7 @@ import { toPublicUser } from '../users/user.serializer';
 import { getBlockedIds, isBlockedEitherWay } from '../users/users.service';
 import { voiceCredentials } from '../voice/agora';
 import { creditCallMinute } from '../earnings/earnings.service';
+import { leaveAllRooms } from '../rooms/rooms.service';
 import { assertActsAsUser, isListener } from '../users/accountRules';
 import { debitIntoEntry, getBalance } from '../wallet/wallet.service';
 import { Call, FINAL_STATUSES, type CallDoc, type EndReason, type FinalStatus } from './call.model';
@@ -129,11 +130,24 @@ export async function acceptCall(callee: UserDoc, callId: string) {
     setInterval(runSafely('Billing failed', () => billNextMinute(call.id)), env.billingIntervalSec * 1000),
   );
 
+  // One voice session at a time: a call takes both people out of any voice room
+  await Promise.all([leaveAllRooms(String(call.callerId)), leaveAllRooms(String(call.calleeId))]);
+
   const callerVoice = voiceCredentials(call.channel, String(call.callerId), true);
   const calleeVoice = voiceCredentials(call.channel, String(call.calleeId), true);
   emitToUser(String(call.callerId), 'call:accepted', { callId: call.id, voice: callerVoice });
   emitToUser(String(call.calleeId), 'call:accepted', { callId: call.id, voice: calleeVoice });
   return { callId: call.id as string, voice: calleeVoice };
+}
+
+/**
+ * Fresh voice credentials while the call is active. Voice tokens are short-lived
+ * (AGORA_TOKEN_TTL_SEC), so the app renews them here; after the call ends they can't be renewed.
+ */
+export async function getCallVoice(me: UserDoc, callId: string) {
+  const call = await Call.findOne({ _id: callId, status: 'active', $or: [{ callerId: me._id }, { calleeId: me._id }] });
+  if (!call) throw ApiError.notFound('This call has ended.');
+  return voiceCredentials(call.channel, me.id, true);
 }
 
 export async function rejectCall(callee: UserDoc, callId: string) {

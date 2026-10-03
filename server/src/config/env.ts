@@ -1,5 +1,8 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { z } from 'zod';
+
+// Automated tests set their own configuration and never read the developer's .env
+if (process.env.NODE_ENV !== 'test') dotenv.config({ quiet: true });
 
 /**
  * All configuration comes from environment variables, validated once at startup.
@@ -7,7 +10,11 @@ import { z } from 'zod';
  */
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(4050),
+  PORT: z.coerce.number().int().nonnegative().default(4050),
+  /** Defaults to "info" in production and "debug" otherwise */
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
+  /** Requests per minute per signed-in user (or per IP when signed out), across the whole API */
+  API_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(300),
   MONGO_URI: z.string().min(1, 'MONGO_URI is required'),
   /** Comma-separated list of allowed browser origins (production only) */
   CORS_ORIGINS: z.string().default(''),
@@ -63,10 +70,27 @@ const schema = z.object({
   // Without these the server still runs calls/rooms, but returns no voice credentials.
   AGORA_APP_ID: z.string().optional(),
   AGORA_APP_CERTIFICATE: z.string().optional(),
-  AGORA_TOKEN_TTL_SEC: z.coerce.number().int().positive().default(3600),
+  /** Voice tokens are short-lived and renewed by the app while the call/room is still on, so nobody keeps talking after it ends */
+  AGORA_TOKEN_TTL_SEC: z.coerce.number().int().min(60).default(600),
 });
 
-const parsed = schema.safeParse(process.env);
+/** Mistakes that are fine on a laptop but must never reach real users */
+const productionSchema = schema.superRefine((config, ctx) => {
+  if (config.NODE_ENV !== 'production') return;
+  if (!config.PUBLIC_BASE_URL?.startsWith('https://')) {
+    ctx.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'must be the public https:// address of this server in production' });
+  }
+  if (/^(.)\1+$/.test(config.JWT_SECRET) || /change|secret|example/i.test(config.JWT_SECRET) || config.JWT_SECRET.length < 64) {
+    ctx.addIssue({ code: 'custom', path: ['JWT_SECRET'], message: 'use a fresh random value in production: `openssl rand -hex 48`' });
+  }
+  if (/127\.0\.0\.1|localhost/.test(config.MONGO_URI)) {
+    ctx.addIssue({ code: 'custom', path: ['MONGO_URI'], message: 'points at a local database in production' });
+  }
+});
+
+// An empty line like `DEV_OTP=` in .env means "not set"
+const provided = Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== ''));
+const parsed = productionSchema.safeParse(provided);
 
 if (!parsed.success) {
   console.error(`Invalid environment configuration:\n${z.prettifyError(parsed.error)}`);
@@ -74,6 +98,19 @@ if (!parsed.success) {
 }
 
 const isProduction = parsed.data.NODE_ENV === 'production';
+
+/** Things that still work but need attention before real users arrive. Logged at startup. */
+export function configWarnings(): string[] {
+  const warnings: string[] = [];
+  if (!env.agora) warnings.push('Agora is not configured: calls and rooms work, but without voice credentials');
+  if (isProduction && env.STORAGE_DRIVER === 'local') {
+    warnings.push('STORAGE_DRIVER=local in production: voice intros are lost when the server is redeployed');
+  }
+  if (isProduction && env.corsOrigins.length === 0) {
+    warnings.push('CORS_ORIGINS is empty: fine for the mobile app, but browsers (e.g. a web admin) are refused');
+  }
+  return warnings;
+}
 
 export const env = {
   ...parsed.data,

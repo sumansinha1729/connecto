@@ -20,6 +20,8 @@ export function initRealtime(httpServer: http.Server): IoServer {
     cors: { origin: env.isProduction ? env.corsOrigins : true },
     pingInterval: 20_000,
     pingTimeout: 20_000,
+    // Clients only listen; they never send large messages
+    maxHttpBufferSize: 16 * 1024,
   });
 
   io.use(async (socket, next) => {

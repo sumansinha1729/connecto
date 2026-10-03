@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { CallManager } from '@/components/calls/CallManager';
+import { VoiceManager } from '@/components/voice/VoiceManager';
 import { api } from '@/services';
 import {
   selectIsAdmin,
@@ -119,6 +120,7 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       {inApp && <CallManager />}
+      {inApp && <VoiceManager />}
     </ThemeProvider>
   );
 }

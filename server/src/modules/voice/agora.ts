@@ -28,5 +28,5 @@ export function voiceCredentials(channel: string, userId: string, canSpeak: bool
     ttl,
     ttl,
   );
-  return { appId: env.agora.appId, channel, token, uid, expiresInSec: ttl };
+  return { appId: env.agora.appId, channel, token, uid, expiresInSec: ttl, canSpeak };
 }

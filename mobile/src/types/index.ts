@@ -72,6 +72,8 @@ export interface VoiceCredentials {
   token: string;
   uid: number;
   expiresInSec: number;
+  /** Publisher (can talk) or listen-only */
+  canSpeak: boolean;
 }
 
 export type ProfileUpdate = Partial<
@@ -121,6 +123,8 @@ export interface RoomParticipant {
   role: RoomRole;
   isMuted: boolean;
   handRaised: boolean;
+  /** Their uid in the voice channel (matches Agora's speaking reports) */
+  voiceUid: number;
 }
 
 export interface Room {

@@ -14,7 +14,7 @@ import { actsAsUser, assertListener, isListener } from '../users/accountRules';
 import { User, type UserDoc } from '../users/user.model';
 import { toPublicUser, type PublicUser } from '../users/user.serializer';
 import { getBlockedIds, isBlockedEitherWay } from '../users/users.service';
-import { voiceCredentials } from '../voice/agora';
+import { agoraUid, voiceCredentials } from '../voice/agora';
 import { Room, type RoomDoc, type RoomRole } from './room.model';
 
 /*
@@ -30,7 +30,14 @@ export interface RoomDto {
   language: string;
   hostId: string;
   createdAt: string;
-  participants: { user: PublicUser; role: RoomRole; isMuted: boolean; handRaised: boolean }[];
+  participants: {
+    user: PublicUser;
+    role: RoomRole;
+    isMuted: boolean;
+    handRaised: boolean;
+    /** Their uid in the voice channel, so the app can show who is talking */
+    voiceUid: number;
+  }[];
 }
 
 async function toRoomDtos(rooms: RoomDoc[]): Promise<RoomDto[]> {
@@ -45,7 +52,9 @@ async function toRoomDtos(rooms: RoomDoc[]): Promise<RoomDto[]> {
     createdAt: room.createdAt.toISOString(),
     participants: room.participants.flatMap((p) => {
       const user = users.get(String(p.userId));
-      return user ? [{ user: toPublicUser(user), role: p.role as RoomRole, isMuted: p.isMuted, handRaised: p.handRaised }] : [];
+      return user
+        ? [{ user: toPublicUser(user), role: p.role as RoomRole, isMuted: p.isMuted, handRaised: p.handRaised, voiceUid: agoraUid(user.id) }]
+        : [];
     }),
   }));
 }
@@ -93,8 +102,14 @@ export async function getRoom(me: UserDoc, roomId: string): Promise<RoomDto> {
   return toRoomDto(room);
 }
 
+/** One voice session at a time: rooms are off-limits while you're in (or ringing for) a call */
+function assertNotInCall(me: UserDoc) {
+  if (me.activeCallId) throw ApiError.conflict('Finish your call first.');
+}
+
 export async function createRoom(host: UserDoc, input: { title: string; topic: string; language: string }) {
   assertListener(host, 'host voice rooms');
+  assertNotInCall(host);
   await leaveAllRooms(host.id);
 
   const room = new Room({
@@ -113,6 +128,7 @@ export async function createRoom(host: UserDoc, input: { title: string; topic: s
 export async function joinRoom(me: UserDoc, roomId: string): Promise<{ room: RoomDto; voice: VoiceCredentials | null }> {
   if (!me.profileComplete) throw ApiError.badRequest('Complete your profile before joining rooms.');
   if (!actsAsUser(me) && !isListener(me)) throw ApiError.forbidden('Your listener application is still being reviewed.');
+  assertNotInCall(me);
   const room = await getLiveRoom(roomId);
   if (await isBlockedEitherWay(me._id, room.hostId)) throw ApiError.notFound('This room has ended.');
   if (room.removedUserIds.some((id) => String(id) === me.id)) throw ApiError.forbidden('The host removed you from this room.');
@@ -176,6 +192,13 @@ export async function liveRoomIdsForUser(userId: string): Promise<string[]> {
 }
 
 // ---------- In-room actions ----------
+
+/** Fresh voice credentials for your current role (tokens are short-lived and renewed by the app) */
+export async function getRoomVoice(me: UserDoc, roomId: string): Promise<VoiceCredentials | null> {
+  const room = await getLiveRoom(roomId);
+  const participant = getParticipant(room, me._id);
+  return voiceCredentials(room.channel, me.id, canSpeak(participant.role as RoomRole));
+}
 
 export async function setHandRaised(me: UserDoc, roomId: string, raised: boolean) {
   const room = await getLiveRoom(roomId);
