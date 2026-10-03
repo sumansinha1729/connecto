@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { env } from '../../config/env';
 import { MIN_AGE, type REPORT_REASONS } from '../../config/options';
 import { ApiError } from '../../utils/ApiError';
+import { hmac } from '../../utils/crypto';
 import { revokeAllSessions } from '../auth/tokens';
 import { storage } from '../storage/storage';
 import { assertActsAsUser, isListener } from './accountRules';
@@ -30,6 +31,21 @@ export async function isBlockedEitherWay(a: Id, b: Id): Promise<boolean> {
       ],
     }),
   );
+}
+
+/** One-way fingerprint of a phone number, kept on deleted accounts (the number itself is removed) */
+const phoneFingerprint = (phone: string) => hmac(`deleted-phone:${phone}`);
+
+/**
+ * A number whose earlier account was deleted signs up again. People who blocked the old
+ * account keep this person blocked. Returns true if the number had an account before.
+ */
+export async function carryOverFromDeletedAccounts(user: UserDoc): Promise<boolean> {
+  const previous = await User.find({ status: 'deleted', deletedPhoneHash: phoneFingerprint(user.phone) }, { _id: 1 }).lean();
+  if (previous.length === 0) return false;
+  const blocks = await Block.find({ targetId: { $in: previous.map((p) => p._id) } }, { userId: 1 }).lean();
+  for (const block of blocks) await Block.updateOne({ userId: block.userId, targetId: user._id }, {}, { upsert: true });
+  return true;
 }
 
 /** Another user who is active and not blocked either way, or 404 */
@@ -179,6 +195,7 @@ export async function submitListenerApplication(user: UserDoc, input: ListenerAp
 export async function deleteAccount(user: UserDoc): Promise<void> {
   user.set({
     status: 'deleted',
+    deletedPhoneHash: phoneFingerprint(user.phone),
     phone: `deleted:${user.id}:${Date.now()}`,
     name: 'Deleted user',
     bio: '',

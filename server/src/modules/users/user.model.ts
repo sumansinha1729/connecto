@@ -42,6 +42,8 @@ const userSchema = new Schema(
     /** Kept in sync on save; only complete profiles are shown to others */
     profileComplete: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'banned', 'deleted'], default: 'active' },
+    /** On deleted accounts only: keyed hash of the old phone, so blocks follow the person if they sign up again */
+    deletedPhoneHash: { type: String, default: null },
     banReason: { type: String, default: null },
     bannedAt: { type: Date, default: null },
 
@@ -82,6 +84,7 @@ userSchema.pre('save', function () {
 // Matches the default sort of the discover list
 userSchema.index({ status: 1, profileComplete: 1, isOnline: -1, role: 1, rating: -1 });
 userSchema.index({ listenerStatus: 1, 'listenerApplication.appliedAt': 1 });
+userSchema.index({ deletedPhoneHash: 1 }, { sparse: true });
 
 export type UserDoc = HydratedDocument<InferSchemaType<typeof userSchema>>;
 export const User = model('User', userSchema);

@@ -6,6 +6,7 @@ import { randomAvatar } from '../../utils/avatar';
 import { hmac, randomDigits, safeEqual } from '../../utils/crypto';
 import { normalizeIndianPhone } from '../../utils/phone';
 import { User, type UserDoc } from '../users/user.model';
+import { carryOverFromDeletedAccounts } from '../users/users.service';
 import { toMe } from '../users/user.serializer';
 import { credit } from '../wallet/wallet.service';
 import { Otp } from './otp.model';
@@ -98,7 +99,9 @@ async function findOrCreateUser(phone: string): Promise<{ user: UserDoc; isNewUs
 
   try {
     const user = await User.create({ phone, avatar: randomAvatar() });
-    if (env.SIGNUP_BONUS_COINS > 0) {
+    // A number that had an account before keeps its blocks and gets no second welcome bonus
+    const returning = await carryOverFromDeletedAccounts(user);
+    if (env.SIGNUP_BONUS_COINS > 0 && !returning) {
       await credit({
         userId: user._id,
         amount: env.SIGNUP_BONUS_COINS,

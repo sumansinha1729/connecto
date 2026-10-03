@@ -226,6 +226,8 @@ test('wallet: signup bonus, packs, dev recharge, pagination', async () => {
 });
 
 test('delete account', async () => {
+  // A blocks C first: the block must survive C deleting and re-creating their account
+  await call('PUT', `/users/${C.id}/block`, { token: A.token });
   let r = await call('DELETE', '/users/me', { token: C.token });
   check('delete 204', r.status === 204, r);
   r = await call('GET', '/users/me', { token: C.token });
@@ -235,6 +237,13 @@ test('delete account', async () => {
   await sleep(1100);
   const again = await login('9333333333');
   check('same phone can sign up fresh', again.isNewUser === true && again.id !== C.id, again);
+  r = await call('GET', '/users/me/blocked', { token: A.token });
+  check('block follows them to the new account', r.data.users.length === 1 && r.data.users[0].id === again.id, r.data);
+  r = await call('GET', `/users/${A.id}`, { token: again.token });
+  check('…so they still can’t see the person who blocked them', r.status === 404, r);
+  r = await call('GET', '/wallet', { token: again.token });
+  check('no second welcome bonus for a returning number', r.data.balance === 0, r.data.balance);
+  await call('DELETE', `/users/${again.id}/block`, { token: A.token });
 });
 
 test('voice intro must be audio', async () => {
