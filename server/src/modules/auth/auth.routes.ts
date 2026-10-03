@@ -32,6 +32,20 @@ authRouter.post(
   },
 );
 
+// Admin panel login: same codes and limits, but only for admins and never creates accounts
+authRouter.post('/admin/otp/request', otpRequestLimiter, validate({ body: phoneBody }), async (req, res) => {
+  res.json(await requestOtp(req.body.phone, clientMeta(req), { adminOnly: true }));
+});
+
+authRouter.post(
+  '/admin/otp/verify',
+  otpVerifyLimiter,
+  validate({ body: phoneBody.extend({ code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code.') }) }),
+  async (req, res) => {
+    res.json(await verifyOtp(req.body.phone, req.body.code, clientMeta(req), { adminOnly: true }));
+  },
+);
+
 authRouter.post('/refresh', validate({ body: refreshBody }), async (req, res) => {
   res.json(await rotateSession(req.body.refreshToken, clientMeta(req)));
 });

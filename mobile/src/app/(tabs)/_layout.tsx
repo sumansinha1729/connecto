@@ -2,12 +2,12 @@ import { Tabs } from 'expo-router/js-tabs';
 import { Platform } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui';
-import { selectIsAdmin, selectIsListener, useAuthStore } from '@/store/authStore';
+import { selectIsListener, useAuthStore } from '@/store/authStore';
 import { colors } from '@/theme';
 
-type Audience = 'user' | 'listener' | 'everyone' | 'admin';
+type Audience = 'user' | 'listener' | 'everyone';
 
-/** Users and listeners get different tabs; admins also see the Admin tab */
+/** Users and listeners get different tabs (admin work happens in the separate admin/ web panel) */
 const TABS: { name: string; title: string; icon: IconName; iconActive: IconName; for: Audience }[] = [
   { name: 'index', title: 'Home', icon: 'home-outline', iconActive: 'home', for: 'user' },
   { name: 'listener', title: 'Home', icon: 'home-outline', iconActive: 'home', for: 'listener' },
@@ -16,15 +16,13 @@ const TABS: { name: string; title: string; icon: IconName; iconActive: IconName;
   { name: 'wallet', title: 'Wallet', icon: 'wallet-outline', iconActive: 'wallet', for: 'user' },
   { name: 'earnings', title: 'Earnings', icon: 'cash-outline', iconActive: 'cash', for: 'listener' },
   { name: 'profile', title: 'Profile', icon: 'person-outline', iconActive: 'person', for: 'everyone' },
-  { name: 'dashboard', title: 'Admin', icon: 'shield-outline', iconActive: 'shield', for: 'admin' },
 ];
 
 export default function TabsLayout() {
-  const isAdmin = useAuthStore(selectIsAdmin);
   const isListener = useAuthStore(selectIsListener);
 
   const visible = (audience: Audience) =>
-    audience === 'everyone' || (audience === 'admin' ? isAdmin : audience === 'listener' ? isListener : !isListener);
+    audience === 'everyone' || (audience === 'listener' ? isListener : !isListener);
 
   return (
     <Tabs

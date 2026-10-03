@@ -25,6 +25,11 @@ async function audit(admin: UserDoc, action: AdminActionType, targetUserId: Type
   await AdminAction.create({ adminId: admin._id, action, targetUserId, details });
 }
 
+/** Money and approvals for your own account must be handled by another admin */
+function assertNotSelf(admin: UserDoc, userId: Types.ObjectId | string, what: string) {
+  if (String(admin._id) === String(userId)) throw ApiError.forbidden(`Another admin must ${what} for your own account.`);
+}
+
 async function getUserOrThrow(userId: string): Promise<UserDoc> {
   const user = await User.findById(userId);
   if (!user) throw ApiError.notFound('User not found.');
@@ -147,6 +152,7 @@ export async function unbanUser(admin: UserDoc, userId: string) {
 
 /** Manual coin correction (refunds, goodwill). Positive adds, negative removes. */
 export async function adjustWallet(admin: UserDoc, userId: string, amount: number, reason: string) {
+  assertNotSelf(admin, userId, 'adjust coins');
   const user = await getUserOrThrow(userId);
   const entry = {
     userId: user._id,
@@ -177,6 +183,7 @@ export async function listApplications(status: 'pending' | 'approved' | 'rejecte
 
 /** Approval turns the account into a listener (their coins stay, paused, while they are one) */
 export async function approveListener(admin: UserDoc, userId: string, note?: string) {
+  assertNotSelf(admin, userId, 'review the listener application');
   const user = await User.findOneAndUpdate(
     { _id: userId, listenerStatus: 'pending', status: 'active' },
     {
@@ -288,12 +295,19 @@ export async function resolveReport(
 
 export { listPayouts };
 
+async function assertNotOwnPayout(admin: UserDoc, payoutId: string) {
+  const request = await PayoutRequest.findById(payoutId, { userId: 1 }).lean();
+  if (request) assertNotSelf(admin, request.userId, 'process the withdrawal');
+}
+
 export async function payPayout(admin: UserDoc, payoutId: string, reference: string) {
+  await assertNotOwnPayout(admin, payoutId);
   const request = await markPayoutPaid(admin._id, payoutId, reference);
   await audit(admin, 'mark_payout_paid', request.userId, { payoutId, amountPaise: request.amountPaise, reference });
 }
 
 export async function declinePayout(admin: UserDoc, payoutId: string, note: string) {
+  await assertNotOwnPayout(admin, payoutId);
   const request = await rejectPayout(admin._id, payoutId, note);
   await audit(admin, 'reject_payout', request.userId, { payoutId, amountPaise: request.amountPaise, note });
 }
@@ -379,12 +393,20 @@ export async function listAuditLog({ page, limit, targetUserId }: Page & { targe
     .skip((page - 1) * limit)
     .limit(limit)
     .lean();
+  const people = new Map(
+    (await User.find({ _id: { $in: actions.flatMap((a) => [a.adminId, ...(a.targetUserId ? [a.targetUserId] : [])]) } })).map((u) => [
+      u.id as string,
+      userCard(u),
+    ]),
+  );
   return {
     actions: actions.map((a) => ({
       id: String(a._id),
       action: a.action,
       adminId: String(a.adminId),
       targetUserId: a.targetUserId ? String(a.targetUserId) : null,
+      admin: people.get(String(a.adminId)) ?? null,
+      target: a.targetUserId ? (people.get(String(a.targetUserId)) ?? null) : null,
       details: a.details,
       createdAt: a.createdAt.toISOString(),
     })),

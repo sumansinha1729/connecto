@@ -4,13 +4,19 @@ import { Avatar, Button, EmptyState, Header, LoadingView, Screen, Text } from '@
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { api } from '@/services';
 import { colors, spacing } from '@/theme';
-import { notify } from '@/utils/dialog';
+import { confirm, notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
 
 export default function BlockedScreen() {
   const { data: users, setData, loading, error, refresh } = useAsyncData(() => api.users.listBlocked(), []);
 
-  const unblock = async (userId: string) => {
+  const unblock = async (userId: string, name: string) => {
+    const ok = await confirm({
+      title: `Unblock ${name}?`,
+      message: 'You’ll be able to see each other again, and calls between you will be allowed.',
+      confirmText: 'Unblock',
+    });
+    if (!ok) return;
     try {
       await api.users.setBlocked(userId, false);
       setData((users ?? []).filter((u) => u.id !== userId));
@@ -31,7 +37,7 @@ export default function BlockedScreen() {
             <Text variant="bodyStrong" style={styles.name}>
               {item.name}
             </Text>
-            <Button title="Unblock" variant="secondary" size="sm" onPress={() => unblock(item.id)} />
+            <Button title="Unblock" variant="secondary" size="sm" onPress={() => unblock(item.id, item.name)} />
           </View>
         )}
         ListEmptyComponent={

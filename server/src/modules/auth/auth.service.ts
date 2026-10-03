@@ -23,11 +23,22 @@ function parsePhone(input: string): string {
 
 const otpHash = (phone: string, code: string) => hmac(`otp:${phone}:${code}`);
 
+export interface LoginOptions {
+  /**
+   * Admin panel login: codes are only sent to (and accepted for) active admins, and no
+   * account is ever created. The response looks the same either way, so the admin panel
+   * can't be used to find out which numbers are admins.
+   */
+  adminOnly?: boolean;
+}
+
+const isActiveAdmin = async (phone: string) => Boolean(await User.exists({ phone, isAdmin: true, status: 'active' }));
+
 /**
  * Sends a login code. Limits: one code per OTP_RESEND_SEC, and at most
  * OTP_MAX_PER_WINDOW codes per OTP_WINDOW_SEC for each number.
  */
-export async function requestOtp(phoneInput: string, meta: ClientMeta) {
+export async function requestOtp(phoneInput: string, meta: ClientMeta, { adminOnly = false }: LoginOptions = {}) {
   const phone = parsePhone(phoneInput);
   const now = Date.now();
 
@@ -48,6 +59,9 @@ export async function requestOtp(phoneInput: string, meta: ClientMeta) {
   // Only the newest code is valid
   await Otp.updateMany({ phone, consumedAt: null }, { consumedAt: new Date(now) });
 
+  // Not an admin: record the attempt (so limits still apply) but send nothing
+  const silent = adminOnly && !(await isActiveAdmin(phone));
+
   const code = randomDigits(OTP_LENGTH);
   await Otp.create({
     phone,
@@ -55,7 +69,7 @@ export async function requestOtp(phoneInput: string, meta: ClientMeta) {
     expiresAt: new Date(now + env.OTP_TTL_SEC * 1000),
     ip: meta.ip,
   });
-  await sms.sendOtp(phone, code);
+  if (!silent) await sms.sendOtp(phone, code);
 
   return {
     expiresInSec: env.OTP_TTL_SEC,
@@ -64,8 +78,8 @@ export async function requestOtp(phoneInput: string, meta: ClientMeta) {
   };
 }
 
-/** Checks the code, creates the account on first login, and starts a session. */
-export async function verifyOtp(phoneInput: string, code: string, meta: ClientMeta) {
+/** Checks the code, creates the account on first login (app only), and starts a session. */
+export async function verifyOtp(phoneInput: string, code: string, meta: ClientMeta, { adminOnly = false }: LoginOptions = {}) {
   const phone = parsePhone(phoneInput);
   const now = new Date();
 
@@ -85,6 +99,13 @@ export async function verifyOtp(phoneInput: string, code: string, meta: ClientMe
   // Atomic consume, so the same code can't log in twice
   const consumed = await Otp.findOneAndUpdate({ _id: otp._id, consumedAt: null }, { consumedAt: now });
   if (!consumed) throw ApiError.badRequest('This code has already been used. Please request a new one.', 'INVALID_OTP');
+
+  if (adminOnly) {
+    const admin = await User.findOne({ phone, isAdmin: true, status: 'active' });
+    if (!admin) throw ApiError.forbidden('This number doesn’t have admin access.');
+    const tokens = await createSession(admin._id, meta);
+    return { ...tokens, user: toMe(admin), isNewUser: false };
+  }
 
   const { user, isNewUser } = await findOrCreateUser(phone);
   if (user.status === 'banned') throw ApiError.forbidden('Your account has been suspended. Contact support for help.');

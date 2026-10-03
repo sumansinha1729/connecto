@@ -3,6 +3,7 @@ export { Avatar } from './Avatar';
 export { Button } from './Button';
 export { Card } from './Card';
 export { Chip } from './Chip';
+export { DialogHost } from './DialogHost';
 export { CoinBadge } from './CoinBadge';
 export { EmptyState } from './EmptyState';
 export { FormSheet, type FormField } from './FormSheet';

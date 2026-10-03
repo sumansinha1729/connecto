@@ -25,6 +25,7 @@ import {
   unbanUser,
   type UserSearch,
 } from './admin.service';
+import { getLive, getMetrics, getSafety } from './monitoring.service';
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
@@ -38,6 +39,25 @@ const id = (req: { params: Record<string, unknown> }) => req.params.id as string
 
 adminRouter.get('/stats', async (_req, res) => {
   res.json(await getStats());
+});
+
+// ---------- Monitoring ----------
+
+/** Who is online, calls in progress, live rooms. The panel polls this every few seconds. */
+adminRouter.get('/monitoring/live', async (_req, res) => {
+  res.json(await getLive());
+});
+
+adminRouter.get(
+  '/monitoring/metrics',
+  validate({ query: z.object({ period: z.enum(['today', '7d', '30d']).default('7d') }) }),
+  async (_req, res) => {
+    res.json(await getMetrics((res.locals.query as { period: 'today' | '7d' | '30d' }).period));
+  },
+);
+
+adminRouter.get('/monitoring/safety', async (_req, res) => {
+  res.json(await getSafety());
 });
 
 // ---------- Users ----------

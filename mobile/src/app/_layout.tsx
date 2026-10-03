@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { CallManager } from '@/components/calls/CallManager';
+import { DialogHost } from '@/components/ui';
 import { VoiceManager } from '@/components/voice/VoiceManager';
 import { api } from '@/services';
 import {
@@ -37,10 +38,12 @@ export default function RootLayout() {
   const hydrated = useAuthStore((s) => s.hydrated);
   const isLoggedIn = useAuthStore(selectIsLoggedIn);
   const profileComplete = useAuthStore(selectProfileComplete);
-  const isAdmin = useAuthStore(selectIsAdmin);
   const isListener = useAuthStore(selectIsListener);
   const isPendingApplicant = useAuthStore(selectIsPendingApplicant);
-  const inApp = isLoggedIn && profileComplete && !isPendingApplicant;
+  // Admin numbers only get the "use the admin panel" screen, never the user app
+  const isAdmin = useAuthStore(selectIsAdmin);
+  const isMember = isLoggedIn && !isAdmin;
+  const inApp = isMember && profileComplete && !isPendingApplicant;
 
   useEffect(() => bindRealtimeToStores(), []);
 
@@ -53,16 +56,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (!hydrated) return;
     if (isLoggedIn) {
-      api.connection.connect();
       useAuthStore.getState().refreshMe();
-      useWalletStore.getState().refresh().catch(() => {});
+      // Admins don't go online, take calls or have a wallet in the app
+      if (!isAdmin) {
+        api.connection.connect();
+        useWalletStore.getState().refresh().catch(() => {});
+      } else {
+        api.connection.disconnect();
+      }
     } else {
       api.connection.disconnect();
       useWalletStore.getState().reset();
       useEarningsStore.getState().reset();
       useCallStore.getState().reset();
     }
-  }, [hydrated, isLoggedIn]);
+  }, [hydrated, isLoggedIn, isAdmin]);
 
   // Listener earnings load as soon as the account is (or becomes) a listener
   useEffect(() => {
@@ -79,12 +87,16 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
 
-        <Stack.Protected guard={isLoggedIn && !profileComplete}>
+        <Stack.Protected guard={isLoggedIn && isAdmin}>
+          <Stack.Screen name="admin-account" />
+        </Stack.Protected>
+
+        <Stack.Protected guard={isMember && !profileComplete}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
 
         {/* Chose "become a listener" at signup: wait for the review */}
-        <Stack.Protected guard={isLoggedIn && profileComplete && isPendingApplicant}>
+        <Stack.Protected guard={isMember && profileComplete && isPendingApplicant}>
           <Stack.Screen name="application" />
         </Stack.Protected>
 
@@ -107,20 +119,14 @@ export default function RootLayout() {
         </Stack.Protected>
 
         {/* Apply / edit an application: from Profile (users) or the review screen (applicants) */}
-        <Stack.Protected guard={isLoggedIn && profileComplete && !isListener}>
+        <Stack.Protected guard={isMember && profileComplete && !isListener}>
           <Stack.Screen name="listener-apply" options={{ presentation: 'modal' }} />
         </Stack.Protected>
 
-        <Stack.Protected guard={inApp && isAdmin}>
-          <Stack.Screen name="admin/applications" />
-          <Stack.Screen name="admin/payouts" />
-          <Stack.Screen name="admin/reports" />
-          <Stack.Screen name="admin/users" />
-          <Stack.Screen name="admin/user/[id]" />
-        </Stack.Protected>
       </Stack>
       {inApp && <CallManager />}
       {inApp && <VoiceManager />}
+      <DialogHost />
     </ThemeProvider>
   );
 }

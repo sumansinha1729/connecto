@@ -109,6 +109,7 @@ session.onExpired(clearSession);
 
 export const selectIsLoggedIn = (s: AuthState) => Boolean(s.accessToken && s.user);
 export const selectProfileComplete = (s: AuthState) => Boolean(s.user?.profileComplete);
+/** Admin accounts don't use the app; they use the admin web panel */
 export const selectIsAdmin = (s: AuthState) => Boolean(s.user?.isAdmin);
 /** An approved listener account (receives calls, earns ₹) */
 export const selectIsListener = (s: AuthState) => s.user?.role === 'listener' && s.user.listenerStatus === 'approved';
