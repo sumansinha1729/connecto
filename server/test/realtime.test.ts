@@ -325,3 +325,45 @@ test('one voice session at a time', async () => {
   check('accepting a call takes the host out of their room (room ends)', closed?.roomId === roomId, closed);
   await call('POST', `/calls/${id}/end`, { token: A.token });
 });
+
+test('several people calling the same listener at once', async () => {
+  const admin = await makeUser('9810000019', 'Admin2');
+  await makeAdmin(admin);
+  const L = await makeListener('9810000011', 'Lata', admin);
+  const callers = await Promise.all(['9810000021', '9810000022', '9810000023', '9810000024', '9810000025'].map((p, i) => makeUser(p, `Caller${i}`)));
+  await Promise.all([connect(L), ...callers.map((c) => connect(c))]);
+  await sleep(200);
+
+  // Five calls at the same instant
+  const t = Date.now();
+  const results = await Promise.all(callers.map((c) => call('POST', '/calls', { token: c.token, body: { userId: L.id } })));
+  const won = results.filter((r) => r.status === 201);
+  const busy = results.filter((r) => r.status === 409 && /on another call/.test(r.data.error.message));
+  check('exactly one call gets through', won.length === 1, results.map((r) => r.status));
+  check('the other four are told the listener is on another call', busy.length === 4, results.map((r) => r.data));
+  await sleep(300);
+  check('the listener’s phone rings only once', L.events.filter((e) => e.event === 'call:incoming' && e.at >= t).length === 1);
+
+  // While ringing, and then while talking, everyone else stays blocked
+  const winner = callers[results.findIndex((r) => r.status === 201)];
+  const others = callers.filter((c) => c !== winner);
+  let r = await call('GET', `/users/${L.id}`, { token: others[0].token });
+  check('others see the listener as busy', r.data.user.isBusy === true, r.data.user);
+  await call('POST', `/calls/${won[0].data.callId}/accept`, { token: L.token });
+  r = await call('POST', '/calls', { token: others[0].token, body: { userId: L.id } });
+  check('calling during an active call → busy', r.status === 409, r);
+  r = await call('POST', '/calls/match', { token: others[1].token, body: {} });
+  check('random match skips the busy listener', r.status === 404 || r.data.user?.id !== L.id, r);
+  r = await call('GET', '/users', { token: others[0].token });
+  const listed = r.data.users.find((u: any) => u.id === L.id);
+  check('the listeners list marks them busy', listed?.isBusy === true, listed);
+
+  // Once the call ends, the next person gets through
+  await call('POST', `/calls/${won[0].data.callId}/end`, { token: winner.token });
+  await sleep(100);
+  r = await call('GET', `/users/${L.id}`, { token: others[0].token });
+  check('no longer busy after hanging up', r.data.user.isBusy === false, r.data.user);
+  r = await call('POST', '/calls', { token: others[0].token, body: { userId: L.id } });
+  check('the next caller gets through', r.status === 201, r);
+  await call('POST', `/calls/${r.data.callId}/end`, { token: others[0].token });
+});

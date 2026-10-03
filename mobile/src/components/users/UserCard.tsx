@@ -7,7 +7,15 @@ import { formatAgeGender } from '@/utils/format';
 import { ListenerBadge } from './ListenerBadge';
 
 export function isCallable(user: User): boolean {
-  return user.isOnline && (user.role !== 'listener' || user.isAvailable);
+  return user.isOnline && !user.isBusy && (user.role !== 'listener' || user.isAvailable);
+}
+
+/** "Available", "On a call", "Not taking calls" or "Offline", with its colour */
+export function availability(user: User): { label: string; color: string } {
+  if (!user.isOnline) return { label: 'Offline', color: colors.textFaint };
+  if (user.isBusy) return { label: 'On a call', color: colors.warning };
+  if (user.role === 'listener' && !user.isAvailable) return { label: 'Not taking calls', color: colors.textFaint };
+  return { label: 'Available', color: colors.success };
 }
 
 interface UserCardProps {
@@ -18,6 +26,7 @@ interface UserCardProps {
 
 export function UserCard({ user, onPress, onCall }: UserCardProps) {
   const callable = isCallable(user);
+  const status = availability(user);
   const meta = [formatAgeGender(user.age, user.gender), user.languages.slice(0, 2).join(', ')].filter(Boolean).join(' · ');
 
   return (
@@ -39,6 +48,11 @@ export function UserCard({ user, onPress, onCall }: UserCardProps) {
             <Text variant="caption" color="muted">
               {user.rating.toFixed(1)} · {user.totalCalls.toLocaleString('en-IN')} calls
             </Text>
+            {user.isOnline && (
+              <Text variant="caption" style={{ color: status.color, fontWeight: '600' }}>
+                · {status.label}
+              </Text>
+            )}
           </View>
         ) : (
           <Text variant="caption" color="faint" numberOfLines={1}>
@@ -52,7 +66,7 @@ export function UserCard({ user, onPress, onCall }: UserCardProps) {
         disabled={!callable}
         color={colors.white}
         background={callable ? colors.success : colors.surfaceAlt}
-        accessibilityLabel={`Call ${user.name}`}
+        accessibilityLabel={callable ? `Call ${user.name}` : `${user.name}: ${status.label}`}
       />
     </Card>
   );

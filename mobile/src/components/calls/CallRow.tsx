@@ -35,7 +35,7 @@ interface CallRowProps {
 export function CallRow({ call, onPress, onCallBack, onRate }: CallRowProps) {
   const { icon, color, label } = describe(call);
   const missedByMe = call.status === 'missed' && call.direction === 'incoming';
-  const peerFree = call.peer.isOnline && call.peer.isAvailable;
+  const peerFree = call.peer.isOnline && call.peer.isAvailable && !call.peer.isBusy;
   const amount =
     call.direction === 'outgoing'
       ? call.coins > 0

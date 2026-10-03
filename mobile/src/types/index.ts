@@ -15,6 +15,8 @@ export interface User {
   isOnline: boolean;
   /** Listener is accepting calls right now */
   isAvailable: boolean;
+  /** In a call right now (ringing or talking) */
+  isBusy: boolean;
   rating: number;
   ratingCount: number;
   totalCalls: number;

@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ActionSheet, Avatar, Button, Card, Chip, EmptyState, Header, IconButton, LoadingView, Screen, Text } from '@/components/ui';
 import { ListenerBadge } from '@/components/users/ListenerBadge';
-import { isCallable } from '@/components/users/UserCard';
+import { availability, isCallable } from '@/components/users/UserCard';
 import { CALL_RATE_PER_MIN } from '@/constants/config';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useStartCall } from '@/hooks/useStartCall';
@@ -98,7 +98,7 @@ export default function UserProfileScreen() {
           />
           {showCall && (
             <Button
-              title={callable ? `Call · ${CALL_RATE_PER_MIN} coins/min` : 'Not available right now'}
+              title={callable ? `Call · ${CALL_RATE_PER_MIN} coins/min` : user.isBusy ? 'On a call · try again soon' : 'Not available right now'}
               icon="call"
               onPress={() => startCall(user)}
               disabled={!callable}
@@ -121,8 +121,8 @@ export default function UserProfileScreen() {
         <Text variant="body" color="muted">
           {formatAgeGender(user.age, user.gender)}
         </Text>
-        <Text variant="caption" style={{ color: user.isOnline ? colors.success : colors.textFaint }}>
-          {user.isOnline ? (isListener && !user.isAvailable ? 'Online · busy' : 'Online now') : 'Offline'}
+        <Text variant="caption" style={{ color: availability(user).color }}>
+          {user.isOnline && !user.isBusy && (!isListener || user.isAvailable) ? 'Online now' : availability(user).label}
         </Text>
       </View>
 

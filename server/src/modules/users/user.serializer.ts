@@ -14,6 +14,8 @@ export interface PublicUser {
   role: 'user' | 'listener';
   isOnline: boolean;
   isAvailable: boolean;
+  /** In a call right now (ringing or talking) */
+  isBusy: boolean;
   rating: number;
   ratingCount: number;
   totalCalls: number;
@@ -61,6 +63,7 @@ export function toPublicUser(user: UserDoc): PublicUser {
     role: user.role as PublicUser['role'],
     isOnline: user.isOnline,
     isAvailable: user.isAvailable,
+    isBusy: Boolean(user.activeCallId),
     rating: user.rating,
     ratingCount: user.ratingCount,
     totalCalls: user.totalCalls,

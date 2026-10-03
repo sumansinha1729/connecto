@@ -99,7 +99,8 @@ export default function CallsScreen() {
     if (isListener) return [];
     const seen = new Map<string, User>();
     for (const c of calls) if (c.status === 'completed' && !seen.has(c.peer.id)) seen.set(c.peer.id, c.peer);
-    return [...seen.values()].sort((a, b) => Number(b.isOnline && b.isAvailable) - Number(a.isOnline && a.isAvailable)).slice(0, 10);
+    const freeNow = (u: User) => Number(u.isOnline && u.isAvailable && !u.isBusy);
+    return [...seen.values()].sort((a, b) => freeNow(b) - freeNow(a)).slice(0, 10);
   }, [calls, isListener]);
 
   const missedCount = calls.filter((c) => c.status !== 'completed').length;
@@ -114,6 +115,10 @@ export default function CallsScreen() {
   }, [calls, filter]);
 
   const callBack = (peer: User) => {
+    if (peer.isBusy) {
+      notify(`${peer.name} is on another call`, 'Try again in a few minutes.');
+      return;
+    }
     if (!peer.isOnline || !peer.isAvailable) {
       notify(`${peer.name} isn’t available right now`, 'Listeners with a green dot are online and free to talk.');
       return;
@@ -161,7 +166,7 @@ export default function CallsScreen() {
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.people} style={styles.peopleScroll}>
             {talkAgain.map((p) => {
-              const free = p.isOnline && p.isAvailable;
+              const free = p.isOnline && p.isAvailable && !p.isBusy;
               return (
                 <Pressable
                   key={p.id}
@@ -175,8 +180,8 @@ export default function CallsScreen() {
                   <Text variant="caption" numberOfLines={1} style={styles.personName}>
                     {p.name}
                   </Text>
-                  <Text variant="caption" style={{ color: free ? colors.success : colors.textFaint, fontSize: 11 }}>
-                    {free ? 'Free now' : p.isOnline ? 'Busy' : 'Offline'}
+                  <Text variant="caption" style={{ color: free ? colors.success : p.isBusy ? colors.warning : colors.textFaint, fontSize: 11 }}>
+                    {free ? 'Free now' : p.isBusy ? 'On a call' : p.isOnline ? 'Away' : 'Offline'}
                   </Text>
                 </Pressable>
               );

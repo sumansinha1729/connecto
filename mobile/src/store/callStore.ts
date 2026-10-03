@@ -120,11 +120,11 @@ export const useCallStore = create<CallState>()((set, get) => ({
   reset: () => set(initialState),
 
   onIncoming: (callId, from) => {
-    if (isCallActive(get().phase)) {
-      // Busy: automatically decline the second call
-      api.calls.rejectCall(callId).catch(() => {});
-      return;
-    }
+    if (get().callId === callId) return; // same ring delivered twice
+    // The server only rings listeners who are in no call at all, so if this app still thinks it's
+    // in one, that state is stale (e.g. a missed "call ended" while offline): drop it and ring.
+    // Never auto-decline here: a stuck screen must not turn callers away.
+    if (isCallActive(get().phase)) console.warn('[call] replacing a stale call state with an incoming call');
     set({ ...initialState, phase: 'incoming', callId, peer: from, direction: 'incoming' });
   },
 

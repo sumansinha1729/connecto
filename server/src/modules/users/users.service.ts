@@ -237,8 +237,8 @@ export async function listUsers(me: UserDoc, filters: UserFilters) {
   if (filters.gender) query.gender = filters.gender;
 
   const users = await User.find(query)
-    // Online and available first, then best rated
-    .sort({ isOnline: -1, isAvailable: -1, rating: -1, _id: 1 })
+    // Free to talk first (online, available, not in a call), then best rated
+    .sort({ isOnline: -1, isAvailable: -1, activeCallId: 1, rating: -1, _id: 1 })
     .skip((filters.page - 1) * filters.limit)
     .limit(filters.limit);
   return users.map(toPublicUser);
