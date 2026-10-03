@@ -85,11 +85,17 @@ test('chat: messages, history, hidden numbers, limits, deleting', async () => {
   check('host deletes a message, it disappears for everyone', r.status === 204 && deleted?.messageId === firstId, deleted);
 
   r = await call('POST', `/rooms/${roomId}/join`, { token: C.token });
-  const history = r.data.messages;
-  const chats = history.filter((m: any) => m.kind === 'chat');
-  check('people who join late see the recent chat', chats.length === 1 && chats[0].user.name === 'Uma', history);
-  check('…including who joined before them', history.some((m: any) => m.kind === 'join' && m.user.name === 'Usman'), history);
-  check('the person joining sees their own "joined" line', history.at(-1)?.kind === 'join' && history.at(-1).user.name === 'Chetan', history.at(-1));
+  check('chat starts when you join: only your own "joined" line', r.data.messages.length === 1 && r.data.messages[0].kind === 'join' && r.data.messages[0].user.name === 'Chetan', r.data.messages);
+
+  // Usman leaves and comes back: earlier chat is gone for him
+  await sleep(1100);
+  await call('POST', `/rooms/${roomId}/messages`, { token: U2.token, body: { text: 'brb' } });
+  await call('POST', `/rooms/${roomId}/leave`, { token: U2.token });
+  await sleep(20);
+  r = await call('POST', `/rooms/${roomId}/join`, { token: U2.token });
+  check('rejoining starts with a fresh chat', r.data.messages.length === 1 && r.data.messages[0].kind === 'join' && r.data.messages[0].user.name === 'Usman', r.data.messages);
+  r = await call('POST', `/rooms/${roomId}/join`, { token: U2.token });
+  check('re-opening while still in the room keeps your chat', r.data.messages.length === 1, r.data.messages);
 });
 
 test('reactions', async () => {

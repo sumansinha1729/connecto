@@ -42,7 +42,7 @@ export function RoomChat({ messages, meId, accent, onMessageAction }: RoomChatPr
       ListEmptyComponent={
         <View style={styles.empty}>
           <Text variant="caption" color="muted" center>
-            💬 No messages yet. Say hi! Everyone in the room can see the chat.
+            💬 You’ll see messages sent from now on. Say hi!
           </Text>
         </View>
       }
@@ -50,9 +50,9 @@ export function RoomChat({ messages, meId, accent, onMessageAction }: RoomChatPr
         if (item.kind !== 'chat') {
           return (
             <View style={styles.eventRow}>
-              <View style={[styles.event, item.kind === 'system' && { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+              <View style={[styles.event, item.kind === 'system' && { backgroundColor: colors.glass }]}>
                 <Text variant="caption" style={item.kind === 'system' ? [styles.systemText, { color: accent }] : styles.joinText}>
-                  {item.kind === 'join' ? `${item.user?.name ?? 'Someone'} joined 👋` : item.text}
+                  {item.kind === 'join' ? `${item.user?.id === meId ? 'You' : (item.user?.name ?? 'Someone')} joined 👋` : item.text}
                 </Text>
               </View>
             </View>
@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
   name: { color: colors.textMuted, fontWeight: '700', fontSize: 11, marginLeft: spacing.sm },
   mineRow: { alignItems: 'flex-end', paddingLeft: 64 },
   bubble: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: 16 },
-  theirBubble: { backgroundColor: 'rgba(255,255,255,0.1)', borderBottomLeftRadius: 4, alignSelf: 'flex-start' },
+  theirBubble: { backgroundColor: colors.glass, borderBottomLeftRadius: 4, alignSelf: 'flex-start' },
   mineBubble: { borderBottomRightRadius: 4 },
   text: { fontSize: 14, lineHeight: 19, color: colors.text },
   // Dark text: the theme accents are light colours
-  mineText: { fontSize: 14, lineHeight: 19, color: '#120E24', fontWeight: '500' },
+  mineText: { fontSize: 14, lineHeight: 19, color: colors.textOnLight, fontWeight: '500' },
 });

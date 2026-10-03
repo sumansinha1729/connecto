@@ -103,7 +103,7 @@ export const httpApi: Api = {
     endCall: (callId) => http.post(`/calls/${callId}/end`),
     rateCall: (callId, stars) => http.post(`/calls/${callId}/rate`, { stars }),
     getVoice: async (callId) => (await http.get<{ voice: VoiceCredentials | null }>(`/calls/${callId}/voice`)).voice,
-    getHistory: async () => (await http.get<{ calls: CallRecord[] }>('/calls/history')).calls,
+    getHistory: async (before) => (await http.get<{ calls: CallRecord[] }>('/calls/history', { limit: 30, before })).calls,
     findMatch: async (language) => (await http.post<{ user: User }>('/calls/match', language ? { language } : {})).user,
   },
 

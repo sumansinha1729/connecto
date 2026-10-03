@@ -14,10 +14,29 @@ export const colors = {
   successSoft: 'rgba(34, 197, 94, 0.16)',
   danger: '#EF4444',
   dangerSoft: 'rgba(239, 68, 68, 0.16)',
+  dangerLight: '#FCA5A5',
   warning: '#F59E0B',
+  warningSoft: 'rgba(245, 158, 11, 0.14)',
+  warningBorder: 'rgba(245, 158, 11, 0.35)',
+  /** "Trending" badge on busy rooms */
+  trending: '#FDBA74',
+  trendingSoft: 'rgba(251, 146, 60, 0.18)',
   coin: '#FBBF24',
   white: '#FFFFFF',
+  /** Text on light accent colours (e.g. your own chat bubbles) */
+  textOnLight: '#120E24',
+  /** Secondary text on gradient banners */
+  textOnGradient: 'rgba(255, 255, 255, 0.85)',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  /** Translucent layers over coloured / gradient backgrounds (room screens) */
+  glassFaint: 'rgba(255, 255, 255, 0.06)',
+  glassSubtle: 'rgba(255, 255, 255, 0.08)',
+  glass: 'rgba(255, 255, 255, 0.1)',
+  glassStrong: 'rgba(255, 255, 255, 0.12)',
+  /** Large decorative icons on gradient banners */
+  glassIcon: 'rgba(255, 255, 255, 0.35)',
+  shade: 'rgba(0, 0, 0, 0.25)',
+  shadeStrong: 'rgba(0, 0, 0, 0.35)',
 } as const;
 
 export const gradients = {

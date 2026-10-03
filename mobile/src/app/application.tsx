@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    backgroundColor: colors.warningSoft,
   },
   statusIconRejected: { backgroundColor: colors.dangerSoft },
   reason: { gap: spacing.xs, marginBottom: spacing.lg, borderColor: colors.danger },

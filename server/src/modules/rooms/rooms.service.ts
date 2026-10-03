@@ -94,9 +94,11 @@ async function toRoomDto(room: RoomDoc): Promise<RoomDto> {
 
 const card = (user: UserDoc) => ({ id: user.id as string, name: user.name, avatar: user.avatar });
 
-async function toMessageDtos(room: RoomDoc): Promise<RoomMessageDto[]> {
-  const users = new Map((await User.find({ _id: { $in: room.messages.map((m) => m.userId) } })).map((u) => [u.id as string, u]));
-  return room.messages.map((m) => {
+/** The chat as one person sees it: only what was said since they joined (leaving and coming back starts fresh) */
+async function toMessageDtos(room: RoomDoc, since: Date): Promise<RoomMessageDto[]> {
+  const visible = room.messages.filter((m) => m.createdAt >= since);
+  const users = new Map((await User.find({ _id: { $in: visible.map((m) => m.userId) } })).map((u) => [u.id as string, u]));
+  return visible.map((m) => {
     const user = users.get(String(m.userId));
     const kind = (m.kind ?? 'chat') as RoomMessageDto['kind'];
     return { id: String(m._id), kind, text: m.text, user: user ? card(user) : null, createdAt: m.createdAt.toISOString() };
@@ -142,6 +144,10 @@ function assertModerator(room: RoomDoc, user: UserDoc): RoomRole {
   const role = room.participants.find((p) => p.userId.equals(user._id))?.role as RoomRole | undefined;
   if (!role || !isModerator(role)) throw ApiError.forbidden('Only the host or a co-host can do that.');
   return role;
+}
+
+function findJoinedAt(room: RoomDoc, userId: Types.ObjectId): Date {
+  return room.participants.find((p) => p.userId.equals(userId))?.joinedAt ?? new Date();
 }
 
 function getTarget(room: RoomDoc, userId: string) {
@@ -255,7 +261,7 @@ export async function joinRoom(
   return {
     room: await toRoomDto(updated),
     voice: voiceCredentials(updated.channel, me.id, canSpeak(role)),
-    messages: await toMessageDtos(updated),
+    messages: await toMessageDtos(updated, findJoinedAt(updated, me._id)),
   };
 }
 

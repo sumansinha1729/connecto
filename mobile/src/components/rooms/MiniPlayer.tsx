@@ -35,7 +35,7 @@ export function MiniPlayer({ bottom }: { bottom: number }) {
           accessibilityRole="button"
           accessibilityLabel={`Back to room ${room.title}`}
         >
-          <View style={[styles.emoji, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+          <View style={[styles.emoji, { backgroundColor: colors.glass }]}>
             <Text style={styles.emojiText}>{theme.emoji}</Text>
           </View>
           <View style={styles.flex}>
@@ -55,7 +55,7 @@ export function MiniPlayer({ bottom }: { bottom: number }) {
             icon={me.isMuted ? 'mic-off' : 'mic'}
             size={38}
             color={colors.white}
-            background={me.isMuted ? 'rgba(255,255,255,0.12)' : theme.accent}
+            background={me.isMuted ? colors.glassStrong : theme.accent}
             onPress={toggleMic}
             accessibilityLabel={me.isMuted ? 'Unmute' : 'Mute'}
           />
@@ -64,7 +64,7 @@ export function MiniPlayer({ bottom }: { bottom: number }) {
           icon="close"
           size={38}
           color={colors.white}
-          background="rgba(255,255,255,0.12)"
+          background={colors.glassStrong}
           onPress={() => leaveRoomWithConfirm(meId)}
           accessibilityLabel="Leave room"
         />
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.glassStrong,
   },
   emoji: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   emojiText: { fontSize: 20 },

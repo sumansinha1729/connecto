@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: colors.overlay,
   },
   card: {
     width: '100%',

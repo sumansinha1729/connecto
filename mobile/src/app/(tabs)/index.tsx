@@ -66,7 +66,7 @@ export default function HomeScreen() {
                 <Icon name="arrow-forward" size={14} color={colors.primaryDark} />
               </View>
             </View>
-            <Icon name="headset" size={64} color="rgba(255,255,255,0.35)" />
+            <Icon name="headset" size={64} color={colors.glassIcon} />
           </LinearGradient>
         )}
       </Pressable>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
   },
   bannerText: { flex: 1, gap: spacing.xs },
-  bannerSub: { color: 'rgba(255,255,255,0.85)' },
+  bannerSub: { color: colors.textOnGradient },
   bannerCta: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -27,6 +27,24 @@ export function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+/** "1h 20m", "45m", "30s": total talk time */
+export function formatTalkTime(totalSec: number): string {
+  if (totalSec < 60) return `${Math.max(0, Math.round(totalSec))}s`;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+/** Section titles in call history: "Today", "Yesterday", "Mon, 29 Sep" */
+export function formatDayLabel(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
 export function formatCoins(amount: number, withSign = false): string {
   const abs = Math.abs(amount).toLocaleString('en-IN');
   if (!withSign) return abs;

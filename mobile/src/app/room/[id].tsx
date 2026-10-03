@@ -169,19 +169,19 @@ export default function RoomScreen() {
                 {room.title}
               </Text>
               <View style={styles.chips}>
-                <View style={[styles.chip, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                <View style={[styles.chip, { backgroundColor: colors.glass }]}>
                   <Text variant="caption" style={[styles.chipText, { color: theme.accent }]}>
                     {theme.emoji} {room.topic}
                   </Text>
                 </View>
-                <View style={[styles.chip, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                <View style={[styles.chip, { backgroundColor: colors.glass }]}>
                   <Text variant="caption" style={styles.chipText}>
                     {room.language}
                   </Text>
                 </View>
                 <View style={[styles.chip, { backgroundColor: colors.dangerSoft }]}>
                   <View style={styles.liveDot} />
-                  <Text variant="caption" style={[styles.chipText, { color: '#FCA5A5' }]}>
+                  <Text variant="caption" style={[styles.chipText, { color: colors.dangerLight }]}>
                     LIVE · {liveFor(room.createdAt).replace(/^live /, '')}
                   </Text>
                 </View>
@@ -327,7 +327,7 @@ export default function RoomScreen() {
               icon="exit-outline"
               size={44}
               color={colors.text}
-              background="rgba(255,255,255,0.1)"
+              background={colors.glass}
               onPress={leave}
               accessibilityLabel={iAmHost ? 'End or leave room' : 'Leave room'}
             />
@@ -350,7 +350,7 @@ export default function RoomScreen() {
               icon="happy-outline"
               size={44}
               color={picker ? colors.bg : colors.text}
-              background={picker ? theme.accent : 'rgba(255,255,255,0.1)'}
+              background={picker ? theme.accent : colors.glass}
               onPress={() => setPicker(!picker)}
               accessibilityLabel="Reactions"
             />
@@ -359,7 +359,7 @@ export default function RoomScreen() {
                 icon="hand-left"
                 size={44}
                 color={colors.white}
-                background={me.handRaised ? colors.warning : 'rgba(255,255,255,0.1)'}
+                background={me.handRaised ? colors.warning : colors.glass}
                 onPress={() => run(() => actions.setHandRaised(!me.handRaised))}
                 accessibilityLabel={me.handRaised ? 'Lower hand' : 'Raise hand to speak'}
               />
@@ -369,7 +369,7 @@ export default function RoomScreen() {
                   icon={me.isMuted ? 'mic-off' : 'mic'}
                   size={44}
                   color={colors.white}
-                  background={me.isMuted ? 'rgba(255,255,255,0.1)' : theme.accent}
+                  background={me.isMuted ? colors.glass : theme.accent}
                   onPress={() => run(() => actions.setMuted(!me.isMuted))}
                   accessibilityLabel={me.isMuted ? 'Unmute' : 'Mute'}
                 />
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass,
   },
   countText: { color: colors.text, fontWeight: '700' },
   top: { flexGrow: 0 },
@@ -451,9 +451,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: colors.glassSubtle,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.glassSubtle,
   },
   welcomeEmpty: { justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed' },
   pin: { fontSize: 14 },
@@ -464,9 +464,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: colors.shade,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: colors.warningBorder,
   },
   handRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   audienceBlock: { gap: spacing.sm },
@@ -477,10 +477,10 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.glassSubtle,
   },
   // Fills whatever space the stage leaves, so there's no empty gap
-  chat: { flex: 1, minHeight: 150, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  chat: { flex: 1, minHeight: 150, borderTopWidth: 1, borderTopColor: colors.glassFaint },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     padding: spacing.sm,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    backgroundColor: colors.warningSoft,
   },
   bannerText: { flex: 1, color: colors.warning },
   picker: {
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: colors.shadeStrong,
   },
   pickerItem: { padding: spacing.xs },
   pickerEmoji: { fontSize: 26 },
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.md,
     paddingRight: 5,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass,
   },
   input: { flex: 1, height: '100%', color: colors.text, fontSize: 14 },
 });

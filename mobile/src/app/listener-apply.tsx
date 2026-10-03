@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+    backgroundColor: colors.warningSoft,
   },
   footer: { gap: spacing.sm, paddingHorizontal: spacing.lg },
 });

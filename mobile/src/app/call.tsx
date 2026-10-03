@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     padding: spacing.md,
     borderRadius: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.warningSoft,
   },
   warningText: { flex: 1, color: colors.warning },
   audioNote: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 320 },

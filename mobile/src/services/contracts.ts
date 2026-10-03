@@ -63,7 +63,8 @@ export interface CallService {
   rateCall(callId: string, stars: number): Promise<void>;
   /** Fresh voice credentials while the call is on (voice tokens are short-lived) */
   getVoice(callId: string): Promise<VoiceCredentials | null>;
-  getHistory(): Promise<CallRecord[]>;
+  /** Newest first. Pass the oldest `startedAt` you have to load the page before it. */
+  getHistory(before?: string): Promise<CallRecord[]>;
   /** Finds a random available listener to talk to */
   findMatch(language?: string | null): Promise<User>;
 }

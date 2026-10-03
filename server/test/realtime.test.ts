@@ -156,6 +156,13 @@ test('call: decline, cancel, no answer', async () => {
   check('history statuses', JSON.stringify(statuses) === JSON.stringify(['missed', 'cancelled', 'rejected']), statuses);
   r = await call('GET', '/wallet', { token: A.token });
   check('unanswered calls are free', r.data.balance === 30, r.data.balance);
+
+  // History pages: newest first, then older ones with ?before=
+  const first = await call('GET', '/calls/history?limit=2', { token: B.token });
+  const next = await call('GET', `/calls/history?limit=2&before=${encodeURIComponent(first.data.calls[1].startedAt)}`, { token: B.token });
+  const ids = [...first.data.calls, ...next.data.calls].map((c: any) => c.id);
+  check('history pages don’t repeat or skip', first.data.calls.length === 2 && next.data.calls.length === 2 && new Set(ids).size === 4, ids);
+  check('older page is older', Date.parse(next.data.calls[0].startedAt) < Date.parse(first.data.calls[1].startedAt), { first: first.data.calls, next: next.data.calls });
 });
 
 test('call: caller runs out of coins', async () => {

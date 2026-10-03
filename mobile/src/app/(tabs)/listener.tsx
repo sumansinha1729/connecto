@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   availability: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   availabilityOn: { borderColor: colors.success },
   today: { marginTop: spacing.lg, padding: spacing.xl, borderRadius: radius.xl, gap: spacing.xs },
-  todayLabel: { color: 'rgba(255,255,255,0.85)' },
+  todayLabel: { color: colors.textOnGradient },
   todayStats: { flexDirection: 'row', justifyContent: 'space-between' },
   links: { marginTop: spacing.lg, padding: spacing.xs },
   section: { marginTop: spacing.xl, marginBottom: spacing.sm },

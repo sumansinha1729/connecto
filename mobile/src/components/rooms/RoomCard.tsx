@@ -33,12 +33,12 @@ export function RoomCard({ room, joined, onPress }: RoomCardProps) {
             <Text style={styles.liveText}>LIVE</Text>
           </View>
           {room.participants.length >= TRENDING_AT && (
-            <View style={[styles.pill, { backgroundColor: 'rgba(251, 146, 60, 0.18)' }]}>
-              <Text style={[styles.pillText, { color: '#FDBA74' }]}>🔥 Trending</Text>
+            <View style={[styles.pill, { backgroundColor: colors.trendingSoft }]}>
+              <Text style={[styles.pillText, { color: colors.trending }]}>🔥 Trending</Text>
             </View>
           )}
           {joined && (
-            <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.12)' }]}>
+            <View style={[styles.pill, { backgroundColor: colors.glassStrong }]}>
               <Text style={[styles.pillText, { color: theme.accent }]}>You’re here</Text>
             </View>
           )}
@@ -76,10 +76,10 @@ export function RoomCard({ room, joined, onPress }: RoomCardProps) {
         </View>
 
         <View style={styles.footer}>
-          <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+          <View style={[styles.pill, { backgroundColor: colors.glassSubtle }]}>
             <Text style={[styles.pillText, { color: theme.accent }]}>{room.topic}</Text>
           </View>
-          <View style={[styles.pill, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+          <View style={[styles.pill, { backgroundColor: colors.glassSubtle }]}>
             <Text style={[styles.pillText, { color: colors.textMuted }]}>{room.language}</Text>
           </View>
           <View style={styles.flex} />
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.glassSubtle,
   },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   live: {
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   titles: { gap: 2 },
   stageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatars: { flexDirection: 'row' },
-  avatarWrap: { borderRadius: 17, borderWidth: 2, borderColor: 'rgba(0,0,0,0.35)' },
+  avatarWrap: { borderRadius: 17, borderWidth: 2, borderColor: colors.shadeStrong },
   names: { flex: 1, fontWeight: '600' },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   flex: { flex: 1 },
