@@ -13,6 +13,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
+    "firebase": "^12.19.0",
     "lucide-react": "^1.51.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

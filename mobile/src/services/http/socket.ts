@@ -46,6 +46,7 @@ export const socketConnection: RealtimeConnection = {
     for (const event of FORWARDED_EVENTS) {
       socket.on(event, (payload: unknown) => realtime.emit(event, payload as never));
     }
+    socket.on('connect', () => realtime.emit('connection:open', {}));
 
     // The server rejects expired tokens; refresh and try again
     socket.on('connect_error', async (error) => {

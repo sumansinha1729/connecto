@@ -136,7 +136,7 @@ test('reports and bans', async () => {
   });
   check('resolve with ban', r.status === 204, r);
   const ended = await waitFor(Y, 'call:ended', { since: t, where: (p) => p.callId === callId });
-  check('other side’s call ends when user is banned', ended?.reason === 'peer_hangup', ended);
+  check('other side’s call ends when user is banned', ended?.reason === 'peer_disconnected', ended);
   check('banned user’s socket is disconnected', !!(await waitFor(U, 'disconnect', { since: t })));
   r = await call('GET', '/users/me', { token: U.token });
   check('banned user’s token → 403 suspended', r.status === 403 && /suspended/.test(r.data.error.message), r);

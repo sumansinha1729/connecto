@@ -16,6 +16,8 @@ Object.assign(process.env, {
   MONGO_URI: `${TEST_MONGO_URL}/connecto_test`,
   JWT_SECRET: 'test-only-secret-that-is-long-enough-1234567890',
   DEV_OTP: '123456',
+  // Firebase logins are checked against a test key (see firebase-login.test.ts)
+  FIREBASE_PROJECT_ID: 'connecto-test',
   OTP_RESEND_SEC: '1',
   CALL_BILLING_INTERVAL_SEC: '2',
   CALL_RING_TIMEOUT_SEC: '3',

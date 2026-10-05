@@ -37,6 +37,11 @@ const schema = z.object({
   OTP_IP_MAX_PER_WINDOW: z.coerce.number().int().positive().default(50),
   /** Accepted for every number outside production, so testing doesn't need SMS */
   DEV_OTP: z.string().regex(/^\d{6}$/).optional(),
+  /**
+   * Firebase project ID (Firebase console → Project settings). Real logins use Firebase Phone
+   * Auth: Google sends the SMS, and the server only checks Google's signed proof of the number.
+   */
+  FIREBASE_PROJECT_ID: z.string().regex(/^[a-z0-9-]{4,40}$/, 'must be the Firebase project ID, e.g. connecto-app-1a2b3').optional(),
 
   // Coins
   SIGNUP_BONUS_COINS: z.coerce.number().int().nonnegative().default(50),
@@ -82,6 +87,9 @@ const productionSchema = schema.superRefine((config, ctx) => {
   }
   if (/^(.)\1+$/.test(config.JWT_SECRET) || /change|secret|example/i.test(config.JWT_SECRET) || config.JWT_SECRET.length < 64) {
     ctx.addIssue({ code: 'custom', path: ['JWT_SECRET'], message: 'use a fresh random value in production: `openssl rand -hex 48`' });
+  }
+  if (!config.FIREBASE_PROJECT_ID) {
+    ctx.addIssue({ code: 'custom', path: ['FIREBASE_PROJECT_ID'], message: 'is required in production: it is the only way to log in' });
   }
   if (/127\.0\.0\.1|localhost/.test(config.MONGO_URI)) {
     ctx.addIssue({ code: 'custom', path: ['MONGO_URI'], message: 'points at a local database in production' });

@@ -25,6 +25,20 @@ export interface User {
 
 export type ListenerStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
+/** Extra details on a listener's public profile */
+export interface ListenerProfile {
+  /** Their approved voice intro, so callers can hear them first */
+  voiceIntroUrl: string | null;
+  voiceIntroDurationSec: number | null;
+  listenerSince: string;
+  minutesTalked: number;
+  /** % of calls picked up in the last 30 days; null until there are enough calls */
+  answerRate: number | null;
+  ratingBreakdown: { stars: number; count: number }[];
+  /** Completed calls between you and them */
+  callsWithYou: number;
+}
+
 /** A listener application as the applicant sees it (the private details are admin-only) */
 export interface ListenerApplication {
   fullName: string | null;
@@ -96,11 +110,29 @@ export type CallStatus = 'completed' | 'missed' | 'rejected' | 'cancelled';
 export type CallEndReason =
   | 'hangup'
   | 'peer_hangup'
+  /** The other person's app lost its connection */
+  | 'peer_disconnected'
   | 'rejected'
   | 'no_answer'
   | 'busy'
   | 'cancelled'
-  | 'insufficient_balance';
+  | 'insufficient_balance'
+  /** App-side only: you answered on another device */
+  | 'answered_elsewhere'
+  /** App-side only: no audio from the other person, so the app hung up */
+  | 'no_audio';
+
+/** GET /calls/active */
+export interface ActiveCall {
+  callId: string;
+  status: 'ringing' | 'active';
+  direction: CallDirection;
+  /** The device this side is using; null while an incoming call rings on all your devices */
+  deviceId: string | null;
+  peer: User;
+  answeredAt: string | null;
+  voice: VoiceCredentials | null;
+}
 
 export interface CallRecord {
   id: string;

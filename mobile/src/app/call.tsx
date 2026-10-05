@@ -22,6 +22,12 @@ function endTitle(reason: CallEndReason | null, direction: CallDirection | null,
   switch (reason) {
     case 'peer_hangup':
       return `${name} ended the call`;
+    case 'peer_disconnected':
+      return `${name} lost connection`;
+    case 'answered_elsewhere':
+      return 'Answered on another device';
+    case 'no_audio':
+      return 'Call ended: the audio couldn’t connect';
     case 'rejected':
       return outgoing ? `${name} declined your call` : 'Call declined';
     case 'no_answer':
@@ -277,7 +283,7 @@ export default function CallScreen() {
               >
                 <Icon name={call.muted ? 'mic-off' : 'mic'} size={26} color={call.muted ? colors.bg : colors.white} />
               </ControlButton>
-              <ControlButton label="End" onPress={call.hangup} background={colors.danger} size={72}>
+              <ControlButton label="End" onPress={() => call.hangup()} background={colors.danger} size={72}>
                 <MaterialIcons name="call-end" size={32} color={colors.white} />
               </ControlButton>
               {/* Browsers pick the output device themselves */}

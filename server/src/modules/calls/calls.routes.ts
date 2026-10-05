@@ -21,8 +21,11 @@ export const callsRouter = Router();
 callsRouter.use(requireAuth);
 
 /** Start ringing someone. Progress arrives as `call:*` socket events. */
-callsRouter.post('/', validate({ body: z.object({ userId: objectId }) }), async (req, res) => {
-  res.status(201).json(await startCall(currentUser(req), req.body.userId));
+/** Random id of the phone/browser making the request (another device on the same account stays out of the call) */
+const deviceId = z.string().regex(/^[\w-]{8,64}$/).optional();
+
+callsRouter.post('/', validate({ body: z.object({ userId: objectId, deviceId }) }), async (req, res) => {
+  res.status(201).json(await startCall(currentUser(req), req.body.userId, req.body.deviceId));
 });
 
 callsRouter.get('/active', async (req, res) => {
@@ -46,8 +49,8 @@ callsRouter.post('/match', validate({ body: z.object({ language: z.enum(LANGUAGE
   res.json({ user: await findMatch(currentUser(req), req.body.language) });
 });
 
-callsRouter.post('/:id/accept', validate({ params: idParams }), async (req, res) => {
-  res.json(await acceptCall(currentUser(req), req.params.id as string));
+callsRouter.post('/:id/accept', validate({ params: idParams, body: z.object({ deviceId }).default({}) }), async (req, res) => {
+  res.json(await acceptCall(currentUser(req), req.params.id as string, req.body.deviceId));
 });
 
 /** Renewed voice credentials for an active call */

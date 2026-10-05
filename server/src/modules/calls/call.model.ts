@@ -3,6 +3,7 @@ import { model, Schema, Types, type HydratedDocument, type InferSchemaType } fro
 export const CALL_STATUSES = ['ringing', 'active', 'completed', 'missed', 'rejected', 'cancelled'] as const;
 export const FINAL_STATUSES = ['completed', 'missed', 'rejected', 'cancelled'] as const;
 export type FinalStatus = (typeof FINAL_STATUSES)[number];
+export type LiveStatus = 'ringing' | 'active';
 
 /** Stored reason a call ended (the per-user wording is derived when notifying) */
 export const END_REASONS = ['hangup', 'rejected', 'no_answer', 'cancelled', 'insufficient_balance', 'disconnected', 'server_restart'] as const;
@@ -19,6 +20,9 @@ const callSchema = new Schema(
     endedAt: { type: Date, default: null },
     endReason: { type: String, enum: END_REASONS, default: null },
     endedBy: { type: Types.ObjectId, ref: 'User', default: null },
+    /** The phone/browser each side is using, so another device on the same account stays out of the call */
+    callerDeviceId: { type: String, default: null },
+    calleeDeviceId: { type: String, default: null },
     durationSec: { type: Number, default: 0 },
     /** Minutes charged so far; also guards against billing the same minute twice */
     billedMinutes: { type: Number, default: 0 },

@@ -152,6 +152,22 @@ test('billing: coins from the user, ₹ to the listener', async () => {
   check('listener history shows ₹ earned', r.data.calls[0]?.earnedPaise === 400 && r.data.calls[0].coins === 0, r.data.calls[0]);
   r = await call('GET', '/earnings', { token: U.token });
   check('users have no earnings page', r.status === 403, r);
+
+  // The listener's public profile, as a caller sees it
+  await call('POST', `/calls/${callId}/rate`, { token: U.token, body: { stars: 5 } });
+  r = await call('GET', `/users/${L.id}`, { token: U.token });
+  const lp = r.data.listenerProfile;
+  check('listener profile has their voice intro', /\/media\/voice-intro_/.test(lp?.voiceIntroUrl ?? '') && lp.voiceIntroDurationSec === 42, lp);
+  const media = await fetch(onTestServer(lp.voiceIntroUrl));
+  check('…and it plays for callers', media.status === 200, media.status);
+  check('rating breakdown from real calls', lp.ratingBreakdown.find((b: any) => b.stars === 5)?.count === 1, lp.ratingBreakdown);
+  check('calls with you counted', lp.callsWithYou === 1, lp);
+  check('answer rate hidden until there are enough calls', lp.answerRate === null, lp);
+  check('private application details stay private', !JSON.stringify(r.data).includes('Lata Sharma') && !JSON.stringify(r.data).includes('Pune'), r.data);
+  r = await call('GET', `/users/${U2.id}`, { token: U.token });
+  check('normal users have no listener profile', r.status === 200 && r.data.listenerProfile === null, r.data);
+  r = await call('GET', `/users/${L.id}`, { token: L.token });
+  check('listeners can preview their own profile', r.status === 200 && r.data.listenerProfile?.voiceIntroUrl, r.data);
 });
 
 test('payouts: details, minimum, one open request, admin pay/reject', async () => {

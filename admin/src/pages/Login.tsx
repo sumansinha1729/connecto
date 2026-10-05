@@ -1,16 +1,18 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 
 import { adminApi } from '../api/admin';
 import { errorMessage, sessionStore } from '../api/client';
 import { Button } from '../components/ui';
+import { confirmFirebaseCode, firebaseErrorMessage, firebaseLoginEnabled, sendFirebaseCode } from '../lib/firebase';
 
-/** Phone + one-time code. Only numbers marked as admin receive a code. */
+/** Phone + one-time code (Firebase sends the SMS). Only admin numbers can log in. */
 export function LoginPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const recaptchaRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -25,11 +27,15 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await adminApi.requestCode(digits);
-      setDevOtp(res.devOtp ?? null);
+      if (firebaseLoginEnabled) {
+        await sendFirebaseCode(digits, recaptchaRef.current!);
+      } else {
+        const res = await adminApi.requestCode(digits);
+        setDevOtp(res.devOtp ?? null);
+      }
       setStep('code');
     } catch (err) {
-      setError(errorMessage(err));
+      setError(firebaseErrorMessage(err, errorMessage));
     } finally {
       setBusy(false);
     }
@@ -40,12 +46,14 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await adminApi.verifyCode(digits, code);
+      const res = firebaseLoginEnabled
+        ? await adminApi.loginWithFirebase(await confirmFirebaseCode(code))
+        : await adminApi.verifyCode(digits, code);
       queryClient.clear();
       sessionStore.set(res);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(firebaseErrorMessage(err, errorMessage));
       setBusy(false);
     }
   }
@@ -79,7 +87,15 @@ export function LoginPage() {
         ) : (
           <form onSubmit={verify} className="space-y-4">
             <p className="text-sm text-muted">
-              If <span className="tabular text-text">{digits}</span> is an admin number, a 6-digit code was sent to it.
+              {firebaseLoginEnabled ? (
+                <>
+                  We sent a 6-digit code to <span className="tabular text-text">+91 {digits}</span>.
+                </>
+              ) : (
+                <>
+                  If <span className="tabular text-text">{digits}</span> is an admin number, a 6-digit code was sent to it.
+                </>
+              )}
             </p>
             {devOtp && <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">Test mode: use code {devOtp}</p>}
             <label className="block text-sm">
@@ -111,6 +127,8 @@ export function LoginPage() {
             </button>
           </form>
         )}
+        {/* Google's "not a robot" check for Firebase (invisible unless it needs a puzzle) */}
+        <div ref={recaptchaRef} />
       </div>
     </div>
   );

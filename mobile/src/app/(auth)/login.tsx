@@ -5,8 +5,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button, Icon, Screen, Text, TextField, type IconName } from '@/components/ui';
 import { api } from '@/services';
+import { firebaseLoginEnabled, phoneAuth, phoneAuthErrorMessage } from '@/services/phoneAuth';
 import { colors, gradients, spacing } from '@/theme';
-import { getErrorMessage } from '@/utils/errors';
 
 const HIGHLIGHTS: { icon: IconName; text: string }[] = [
   { icon: 'happy', text: 'Stay anonymous with a generated avatar' },
@@ -23,11 +23,16 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      const { devOtp } = await api.auth.requestOtp(phone);
-      // The server only returns devOtp outside production
-      router.push({ pathname: '/otp', params: { phone, ...(devOtp && { devOtp }) } });
+      if (firebaseLoginEnabled) {
+        await phoneAuth.sendCode(phone);
+        router.push({ pathname: '/otp', params: { phone } });
+      } else {
+        const { devOtp } = await api.auth.requestOtp(phone);
+        // The server only returns devOtp outside production
+        router.push({ pathname: '/otp', params: { phone, ...(devOtp && { devOtp }) } });
+      }
     } catch (e) {
-      setError(getErrorMessage(e));
+      setError(phoneAuthErrorMessage(e));
     } finally {
       setLoading(false);
     }

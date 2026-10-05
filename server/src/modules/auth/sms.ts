@@ -1,7 +1,10 @@
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 
-/** Sends OTP codes. Swap the implementation for MSG91 / Firebase in the real-OTP step. */
+/**
+ * Dev codes only (local development and tests): the code is printed to the server console.
+ * Real logins use Firebase Phone Auth, where Google sends the SMS (see firebase.ts).
+ */
 export interface SmsProvider {
   sendOtp(phone: string, code: string): Promise<void>;
 }

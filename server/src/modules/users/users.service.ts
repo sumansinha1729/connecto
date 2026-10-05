@@ -5,6 +5,7 @@ import { MIN_AGE, type REPORT_REASONS } from '../../config/options';
 import { ApiError } from '../../utils/ApiError';
 import { hmac } from '../../utils/crypto';
 import { revokeAllSessions } from '../auth/tokens';
+import { Call } from '../calls/call.model';
 import { storage } from '../storage/storage';
 import { assertActsAsUser, isListener } from './accountRules';
 import { Block, Favorite, Report } from './relations.model';
@@ -244,10 +245,65 @@ export async function listUsers(me: UserDoc, filters: UserFilters) {
   return users.map(toPublicUser);
 }
 
+/** What callers see on a listener's profile, beyond the basic public fields */
+export interface ListenerProfileDto {
+  /** Their approved voice intro, so callers can hear them before calling */
+  voiceIntroUrl: string | null;
+  voiceIntroDurationSec: number | null;
+  listenerSince: string;
+  minutesTalked: number;
+  /** % of calls they picked up in the last 30 days; null until there are enough calls */
+  answerRate: number | null;
+  /** How many callers gave 5★, 4★ … 1★ */
+  ratingBreakdown: { stars: number; count: number }[];
+  /** Completed calls between you and them */
+  callsWithYou: number;
+}
+
+const ANSWER_RATE_MIN_CALLS = 5;
+
+async function listenerProfile(me: UserDoc, listener: UserDoc): Promise<ListenerProfileDto> {
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [talked, recent, ratings, withYou] = await Promise.all([
+    Call.aggregate<{ sec: number }>([
+      { $match: { calleeId: listener._id, status: 'completed' } },
+      { $group: { _id: null, sec: { $sum: '$durationSec' } } },
+    ]),
+    Call.aggregate<{ _id: string; n: number }>([
+      // Calls the caller cancelled never reached a decision, so they don't count
+      { $match: { calleeId: listener._id, createdAt: { $gte: monthAgo }, status: { $in: ['completed', 'missed', 'rejected'] } } },
+      { $group: { _id: '$status', n: { $sum: 1 } } },
+    ]),
+    Call.aggregate<{ _id: number; n: number }>([
+      { $match: { calleeId: listener._id, status: 'completed', 'ratings.0': { $exists: true } } },
+      { $unwind: '$ratings' },
+      { $match: { $expr: { $eq: ['$ratings.userId', '$callerId'] } } },
+      { $group: { _id: '$ratings.stars', n: { $sum: 1 } } },
+    ]),
+    Call.countDocuments({ status: 'completed', $or: [{ callerId: me._id, calleeId: listener._id }, { callerId: listener._id, calleeId: me._id }] }),
+  ]);
+  const decided = recent.reduce((n, r) => n + r.n, 0);
+  const answered = recent.find((r) => r._id === 'completed')?.n ?? 0;
+  const app = listener.listenerApplication;
+  return {
+    voiceIntroUrl: app?.voiceIntroKey ? storage.getDownloadUrl(app.voiceIntroKey) : null,
+    voiceIntroDurationSec: app?.voiceIntroDurationSec ?? null,
+    listenerSince: (app?.reviewedAt ?? listener.createdAt).toISOString(),
+    minutesTalked: Math.round((talked[0]?.sec ?? 0) / 60),
+    answerRate: decided >= ANSWER_RATE_MIN_CALLS ? Math.round((answered / decided) * 100) : null,
+    ratingBreakdown: [5, 4, 3, 2, 1].map((stars) => ({ stars, count: ratings.find((r) => r._id === stars)?.n ?? 0 })),
+    callsWithYou: withYou,
+  };
+}
+
+/** Someone's profile. You can also open your own (listeners: "see how callers see you"). */
 export async function getUserProfile(me: UserDoc, targetId: string) {
-  const target = await getVisibleUser(me, targetId);
+  const target = me.id === targetId ? me : await getVisibleUser(me, targetId);
   const isFavorite = Boolean(await Favorite.exists({ userId: me._id, targetId: target._id }));
-  return { ...toPublicUser(target), isFavorite };
+  return {
+    user: { ...toPublicUser(target), isFavorite },
+    listenerProfile: isListener(target) ? await listenerProfile(me, target) : null,
+  };
 }
 
 // ---------- Favourites ----------

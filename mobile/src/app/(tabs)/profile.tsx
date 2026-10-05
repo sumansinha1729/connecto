@@ -79,6 +79,7 @@ export default function ProfileScreen() {
                 />
               }
             />
+            <ListRow icon="eye-outline" label="See how callers see you" onPress={() => router.push(`/user/${me.id}`)} />
             <ListRow icon="cash" label="Earnings" onPress={() => router.push('/earnings')} />
             <ListRow icon="card" label="Payout details" value={me.payoutMethodLabel ?? 'Not added'} onPress={() => router.push('/payout-method')} />
           </Card>

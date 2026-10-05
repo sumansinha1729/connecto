@@ -2,15 +2,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ActionSheet, Avatar, Button, Card, Chip, EmptyState, Header, IconButton, LoadingView, Screen, Text } from '@/components/ui';
+import { ActionSheet, Avatar, Button, Chip, EmptyState, Header, Icon, IconButton, LoadingView, Screen, Text } from '@/components/ui';
 import { ListenerBadge } from '@/components/users/ListenerBadge';
+import { HelpsWith, ListenerStats, RatingBreakdown, VoiceIntroCard } from '@/components/users/ListenerProfileSections';
 import { availability, isCallable } from '@/components/users/UserCard';
 import { CALL_RATE_PER_MIN } from '@/constants/config';
 import { useAsyncData } from '@/hooks/useAsyncData';
 import { useStartCall } from '@/hooks/useStartCall';
 import { api } from '@/services';
 import { useAuthStore } from '@/store/authStore';
-import { colors, spacing } from '@/theme';
+import { colors, radius, spacing } from '@/theme';
 import { confirm, notify } from '@/utils/dialog';
 import { getErrorMessage } from '@/utils/errors';
 import { formatAgeGender } from '@/utils/format';
@@ -20,15 +21,13 @@ export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const startCall = useStartCall();
   const canCall = useAuthStore((s) => s.user?.role === 'user' && s.user.signupIntent === 'user');
+  const meId = useAuthStore((s) => s.user?.id);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const { data, setData, loading, error, refresh } = useAsyncData(
-    async () => {
-      const { user, isFavorite } = await api.users.getProfile(id);
-      return { user, favorite: isFavorite };
-    },
-    [id],
-  );
+  const { data, setData, loading, error, refresh } = useAsyncData(async () => {
+    const { user, isFavorite, listenerProfile } = await api.users.getProfile(id);
+    return { user, favorite: isFavorite, listenerProfile };
+  }, [id]);
 
   const toggleFavorite = async () => {
     if (!data) return;
@@ -77,10 +76,11 @@ export default function UserProfileScreen() {
     );
   }
 
-  const { user, favorite } = data;
+  const { user, favorite, listenerProfile } = data;
+  const isMe = user.id === meId;
   const callable = isCallable(user);
   // Only normal users call, and only listeners can be called
-  const showCall = canCall && user.role === 'listener';
+  const showCall = canCall && user.role === 'listener' && !isMe;
   const isListener = user.role === 'listener';
 
   return (
@@ -88,28 +88,47 @@ export default function UserProfileScreen() {
       scroll
       padded={false}
       footer={
-        <View style={styles.footer}>
-          <IconButton
-            icon={favorite ? 'heart' : 'heart-outline'}
-            onPress={toggleFavorite}
-            size={52}
-            color={favorite ? colors.accent : colors.text}
-            accessibilityLabel={favorite ? 'Remove from favourites' : 'Add to favourites'}
-          />
-          {showCall && (
-            <Button
-              title={callable ? `Call · ${CALL_RATE_PER_MIN} coins/min` : user.isBusy ? 'On a call · try again soon' : 'Not available right now'}
-              icon="call"
-              onPress={() => startCall(user)}
-              disabled={!callable}
-              style={styles.callButton}
+        isMe ? undefined : (
+          <View style={styles.footer}>
+            <IconButton
+              icon={favorite ? 'heart' : 'heart-outline'}
+              onPress={toggleFavorite}
+              size={52}
+              color={favorite ? colors.accent : colors.text}
+              accessibilityLabel={favorite ? 'Remove from favourites' : 'Add to favourites'}
             />
-          )}
-        </View>
+            {showCall && (
+              <Button
+                title={
+                  callable
+                    ? `Call · ${CALL_RATE_PER_MIN} coins/min`
+                    : user.isBusy
+                      ? 'On a call · try again soon'
+                      : 'Not available right now'
+                }
+                icon="call"
+                onPress={() => startCall(user)}
+                disabled={!callable}
+                style={styles.callButton}
+              />
+            )}
+          </View>
+        )
       }
     >
       <Header
-        right={<IconButton icon="ellipsis-vertical" onPress={() => setMenuOpen(true)} size={40} background="transparent" accessibilityLabel="More options" />}
+        title={isMe ? 'Your public profile' : undefined}
+        right={
+          isMe ? undefined : (
+            <IconButton
+              icon="ellipsis-vertical"
+              onPress={() => setMenuOpen(true)}
+              size={40}
+              background="transparent"
+              accessibilityLabel="More options"
+            />
+          )
+        }
       />
 
       <View style={styles.hero}>
@@ -119,7 +138,7 @@ export default function UserProfileScreen() {
           {isListener && <ListenerBadge />}
         </View>
         <Text variant="body" color="muted">
-          {formatAgeGender(user.age, user.gender)}
+          {[formatAgeGender(user.age, user.gender), user.languages.join(', ')].filter(Boolean).join(' · ')}
         </Text>
         <Text variant="caption" style={{ color: availability(user).color }}>
           {user.isOnline && !user.isBusy && (!isListener || user.isAvailable) ? 'Online now' : availability(user).label}
@@ -127,54 +146,74 @@ export default function UserProfileScreen() {
       </View>
 
       <View style={styles.body}>
-        {isListener && (
-          <View style={styles.stats}>
-            <Card style={styles.stat}>
-              <Text variant="heading">★ {user.rating.toFixed(1)}</Text>
-              <Text variant="caption" color="muted">
-                {user.ratingCount.toLocaleString('en-IN')} ratings
-              </Text>
-            </Card>
-            <Card style={styles.stat}>
-              <Text variant="heading">{user.totalCalls.toLocaleString('en-IN')}</Text>
-              <Text variant="caption" color="muted">
-                calls taken
-              </Text>
-            </Card>
+        {isMe && (
+          <View style={styles.notice}>
+            <Icon name="eye-outline" size={16} color={colors.primary} />
+            <Text variant="caption" style={styles.noticeText}>
+              This is how callers see your profile. Change your bio and topics in Edit profile.
+            </Text>
           </View>
         )}
 
-        {Boolean(user.bio) && (
-          <View style={styles.section}>
-            <Text variant="label" color="muted">
-              About
+        {listenerProfile ? (
+          <>
+            <VoiceIntroCard user={user} profile={listenerProfile} />
+            <ListenerStats user={user} profile={listenerProfile} />
+            {listenerProfile.callsWithYou > 0 && !isMe && (
+              <View style={styles.talked}>
+                <Icon name="call" size={14} color={colors.success} />
+                <Text variant="caption" style={styles.talkedText}>
+                  You’ve talked {listenerProfile.callsWithYou === 1 ? 'once' : `${listenerProfile.callsWithYou} times`}
+                </Text>
+              </View>
+            )}
+            {Boolean(user.bio) && (
+              <View style={styles.section}>
+                <Text variant="label" color="muted">
+                  About
+                </Text>
+                <Text variant="body">{user.bio}</Text>
+              </View>
+            )}
+            <HelpsWith topics={user.interests} />
+            <RatingBreakdown profile={listenerProfile} />
+            <Text variant="caption" color="faint" center>
+              Listener since {new Date(listenerProfile.listenerSince).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
             </Text>
-            <Text variant="body">{user.bio}</Text>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <Text variant="label" color="muted">
-            Speaks
-          </Text>
-          <View style={styles.chips}>
-            {user.languages.map((l) => (
-              <Chip key={l} label={l} icon="language" />
-            ))}
-          </View>
-        </View>
-
-        {user.interests.length > 0 && (
-          <View style={styles.section}>
-            <Text variant="label" color="muted">
-              Likes to talk about
-            </Text>
-            <View style={styles.chips}>
-              {user.interests.map((i) => (
-                <Chip key={i} label={i} />
-              ))}
+          </>
+        ) : (
+          <>
+            {Boolean(user.bio) && (
+              <View style={styles.section}>
+                <Text variant="label" color="muted">
+                  About
+                </Text>
+                <Text variant="body">{user.bio}</Text>
+              </View>
+            )}
+            <View style={styles.section}>
+              <Text variant="label" color="muted">
+                Speaks
+              </Text>
+              <View style={styles.chips}>
+                {user.languages.map((l) => (
+                  <Chip key={l} label={l} icon="language" />
+                ))}
+              </View>
             </View>
-          </View>
+            {user.interests.length > 0 && (
+              <View style={styles.section}>
+                <Text variant="label" color="muted">
+                  Likes to talk about
+                </Text>
+                <View style={styles.chips}>
+                  {user.interests.map((i) => (
+                    <Chip key={i} label={i} />
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -195,8 +234,26 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: spacing.xs, paddingBottom: spacing.xl },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   body: { paddingHorizontal: spacing.lg, gap: spacing.xl },
-  stats: { flexDirection: 'row', gap: spacing.md },
-  stat: { flex: 1, alignItems: 'center', gap: 2 },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+  },
+  noticeText: { flex: 1, color: colors.text },
+  talked: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.successSoft,
+  },
+  talkedText: { color: colors.success, fontWeight: '700' },
   section: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },

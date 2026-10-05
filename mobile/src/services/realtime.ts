@@ -6,7 +6,8 @@ import type { CallEndReason, Room, RoomMessage, User, VoiceCredentials } from '@
 
 export interface ServerEvents {
   'call:incoming': { callId: string; from: User; expiresAt?: string };
-  'call:accepted': { callId: string; voice?: VoiceCredentials | null };
+  /** deviceId = the callee's device that answered (your other devices step aside) */
+  'call:accepted': { callId: string; voice?: VoiceCredentials | null; deviceId?: string | null };
   'call:ended': {
     callId: string;
     reason: CallEndReason;
@@ -33,6 +34,12 @@ export interface ServerEvents {
   'account:updated': { reason: string };
 }
 
+/** Raised by the app itself (not the server) */
+export interface LocalEvents {
+  /** The live connection to the server opened or came back: resync anything that may have been missed */
+  'connection:open': Record<string, never>;
+}
+
 type Handler<T> = (payload: T) => void;
 
 class TypedEmitter<Events extends object> {
@@ -53,4 +60,4 @@ class TypedEmitter<Events extends object> {
   }
 }
 
-export const realtime = new TypedEmitter<ServerEvents>();
+export const realtime = new TypedEmitter<ServerEvents & LocalEvents>();

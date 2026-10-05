@@ -3,11 +3,13 @@
  * `http/` implements them against the backend.
  */
 import type {
+  ActiveCall,
   AuthTokens,
   CallRecord,
   CreateRoomInput,
   EarningsSummary,
   ListenerApplicationInput,
+  ListenerProfile,
   Me,
   PayoutMethodInput,
   ProfileUpdate,
@@ -23,8 +25,11 @@ import type {
 } from '@/types';
 
 export interface AuthService {
+  /** Dev codes from our own server (local testing; not available in production) */
   requestOtp(phone: string): Promise<{ devOtp?: string }>;
   verifyOtp(phone: string, code: string): Promise<{ tokens: AuthTokens; user: Me; isNewUser: boolean }>;
+  /** Real login: Firebase checked the SMS code; the server turns its ID token into our session */
+  loginWithFirebase(idToken: string): Promise<{ tokens: AuthTokens; user: Me; isNewUser: boolean }>;
   logout(): Promise<void>;
 }
 
@@ -40,7 +45,8 @@ export interface UserService {
   deleteAccount(): Promise<void>;
   listUsers(filters: UserFilters): Promise<User[]>;
   /** Someone's profile plus whether you've favourited them */
-  getProfile(userId: string): Promise<{ user: User; isFavorite: boolean }>;
+  /** listenerProfile is set for listeners (voice intro, stats, rating breakdown). Your own id works too. */
+  getProfile(userId: string): Promise<{ user: User; isFavorite: boolean; listenerProfile: ListenerProfile | null }>;
   listFavorites(): Promise<User[]>;
   setFavorite(userId: string, favorite: boolean): Promise<void>;
   listBlocked(): Promise<User[]>;
@@ -60,6 +66,8 @@ export interface CallService {
   rejectCall(callId: string): Promise<void>;
   /** Hangs up an active call or cancels a ringing one */
   endCall(callId: string): Promise<void>;
+  /** Your ringing/active call according to the server (to resync after a lost connection or app restart) */
+  getActive(): Promise<ActiveCall | null>;
   rateCall(callId: string, stars: number): Promise<void>;
   /** Fresh voice credentials while the call is on (voice tokens are short-lived) */
   getVoice(callId: string): Promise<VoiceCredentials | null>;

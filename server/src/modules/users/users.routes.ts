@@ -4,9 +4,12 @@ import { z } from 'zod';
 import { GENDERS, INTERESTS, LANGUAGES, MAX_INTERESTS, MAX_LANGUAGES, MIN_AGE, REPORT_REASONS } from '../../config/options';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { disconnectUser } from '../../realtime/io';
 import { ApiError } from '../../utils/ApiError';
 import { AVATAR_PATTERN } from '../../utils/avatar';
 import { idParams } from '../../utils/validators';
+import { endCallsOfOfflineUser } from '../calls/calls.service';
+import { leaveAllRooms } from '../rooms/rooms.service';
 import { toMe } from './user.serializer';
 import {
   deleteAccount,
@@ -73,7 +76,12 @@ usersRouter.patch('/me', validate({ body: profileUpdate }), async (req, res) => 
 });
 
 usersRouter.delete('/me', async (req, res) => {
-  await deleteAccount(currentUser(req));
+  const me = currentUser(req);
+  await deleteAccount(me);
+  // Like a ban: end any call (and its billing), leave rooms, close the app's live connection
+  disconnectUser(me.id);
+  await endCallsOfOfflineUser(me.id);
+  await leaveAllRooms(me.id);
   res.status(204).end();
 });
 
@@ -124,7 +132,7 @@ usersRouter.get('/', validate({ query: listQuery }), async (req, res) => {
 });
 
 usersRouter.get('/:id', validate({ params: idParams }), async (req, res) => {
-  res.json({ user: await getUserProfile(currentUser(req), req.params.id as string) });
+  res.json(await getUserProfile(currentUser(req), req.params.id as string));
 });
 
 usersRouter.put('/:id/favorite', validate({ params: idParams }), async (req, res) => {

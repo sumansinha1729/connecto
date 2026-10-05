@@ -9,6 +9,7 @@ import { User, type UserDoc } from '../users/user.model';
 import { carryOverFromDeletedAccounts } from '../users/users.service';
 import { toMe } from '../users/user.serializer';
 import { credit } from '../wallet/wallet.service';
+import { verifyFirebasePhone } from './firebase';
 import { Otp } from './otp.model';
 import { sms } from './sms';
 import { createSession, type ClientMeta } from './tokens';
@@ -26,8 +27,9 @@ const otpHash = (phone: string, code: string) => hmac(`otp:${phone}:${code}`);
 export interface LoginOptions {
   /**
    * Admin panel login: codes are only sent to (and accepted for) active admins, and no
-   * account is ever created. The response looks the same either way, so the admin panel
-   * can't be used to find out which numbers are admins.
+   * account is ever created. With the dev OTP the response looks the same either way, so the
+   * admin panel can't be used to find out which numbers are admins. (With Firebase, Google
+   * sends the SMS first, so only the person holding the phone learns the answer.)
    */
   adminOnly?: boolean;
 }
@@ -100,6 +102,17 @@ export async function verifyOtp(phoneInput: string, code: string, meta: ClientMe
   const consumed = await Otp.findOneAndUpdate({ _id: otp._id, consumedAt: null }, { consumedAt: now });
   if (!consumed) throw ApiError.badRequest('This code has already been used. Please request a new one.', 'INVALID_OTP');
 
+  return signInVerifiedPhone(phone, meta, { adminOnly });
+}
+
+/** Firebase Phone Auth: Google sent and checked the code; the ID token proves the number */
+export async function loginWithFirebase(idToken: string, meta: ClientMeta, options: LoginOptions = {}) {
+  const phone = await verifyFirebasePhone(idToken);
+  return signInVerifiedPhone(phone, meta, options);
+}
+
+/** The number is proven: start a session, creating the account on first login (app only) */
+async function signInVerifiedPhone(phone: string, meta: ClientMeta, { adminOnly = false }: LoginOptions) {
   if (adminOnly) {
     const admin = await User.findOne({ phone, isAdmin: true, status: 'active' });
     if (!admin) throw ApiError.forbidden('This number doesn’t have admin access.');

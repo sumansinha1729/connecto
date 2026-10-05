@@ -14,7 +14,7 @@ import { creditCallMinute } from '../earnings/earnings.service';
 import { leaveAllRooms } from '../rooms/rooms.service';
 import { assertActsAsUser, isListener } from '../users/accountRules';
 import { debitIntoEntry, getBalance } from '../wallet/wallet.service';
-import { Call, FINAL_STATUSES, type CallDoc, type EndReason, type FinalStatus } from './call.model';
+import { Call, FINAL_STATUSES, type CallDoc, type EndReason, type FinalStatus, type LiveStatus } from './call.model';
 
 /*
  * Call lifecycle
@@ -70,7 +70,7 @@ async function releaseUser(userId: Types.ObjectId, callId: Types.ObjectId) {
 const isReachable = (user: UserDoc) =>
   user.status === 'active' && isListener(user) && user.isAvailable && isUserConnected(user.id);
 
-export async function startCall(caller: UserDoc, calleeId: string) {
+export async function startCall(caller: UserDoc, calleeId: string, deviceId?: string) {
   if (caller.id === calleeId) throw ApiError.badRequest('You can’t call yourself.');
   assertActsAsUser(caller, 'start calls');
   if (!caller.profileComplete) throw ApiError.badRequest('Complete your profile before making calls.');
@@ -89,7 +89,7 @@ export async function startCall(caller: UserDoc, calleeId: string) {
     );
   }
 
-  const call = new Call({ callerId: caller._id, calleeId: callee._id, channel: 'pending' });
+  const call = new Call({ callerId: caller._id, calleeId: callee._id, channel: 'pending', callerDeviceId: deviceId ?? null });
   call.channel = `call_${call.id}`;
 
   if (!(await claimUser(caller._id, call._id))) {
@@ -105,7 +105,7 @@ export async function startCall(caller: UserDoc, calleeId: string) {
   setRingTimer(
     call.id,
     setTimeout(
-      runSafely('Ring timeout failed', () => finishCall(call.id, 'missed', 'no_answer')),
+      runSafely('Ring timeout failed', () => finishCall(call.id, ['ringing'], 'missed', 'no_answer')),
       env.CALL_RING_TIMEOUT_SEC * 1000,
     ),
   );
@@ -114,10 +114,10 @@ export async function startCall(caller: UserDoc, calleeId: string) {
   return { callId: call.id as string, peer: toPublicUser(callee), expiresAt: expiresAt.toISOString() };
 }
 
-export async function acceptCall(callee: UserDoc, callId: string) {
+export async function acceptCall(callee: UserDoc, callId: string, deviceId?: string) {
   const call = await Call.findOneAndUpdate(
     { _id: callId, calleeId: callee._id, status: 'ringing' },
-    { status: 'active', answeredAt: new Date() },
+    { status: 'active', answeredAt: new Date(), calleeDeviceId: deviceId ?? null },
     { returnDocument: 'after' },
   );
   if (!call) throw ApiError.notFound('This call has already ended.');
@@ -125,6 +125,10 @@ export async function acceptCall(callee: UserDoc, callId: string) {
 
   // The first minute is charged on pickup
   if (!(await billMinute(call.id, 1))) throw ApiError.conflict('The caller ran out of coins.');
+
+  // The caller may have hung up while we were billing: then there's nothing to connect
+  const stillActive = async () => Boolean(await Call.exists({ _id: call._id, status: 'active' }));
+  if (!(await stillActive())) throw ApiError.notFound('This call has already ended.');
   setBillingTimer(
     call.id,
     setInterval(runSafely('Billing failed', () => billNextMinute(call.id)), env.billingIntervalSec * 1000),
@@ -132,11 +136,13 @@ export async function acceptCall(callee: UserDoc, callId: string) {
 
   // One voice session at a time: a call takes both people out of any voice room
   await Promise.all([leaveAllRooms(String(call.callerId)), leaveAllRooms(String(call.calleeId))]);
+  if (!(await stillActive())) throw ApiError.notFound('This call has already ended.');
 
   const callerVoice = voiceCredentials(call.channel, String(call.callerId), true);
   const calleeVoice = voiceCredentials(call.channel, String(call.calleeId), true);
-  emitToUser(String(call.callerId), 'call:accepted', { callId: call.id, voice: callerVoice });
-  emitToUser(String(call.calleeId), 'call:accepted', { callId: call.id, voice: calleeVoice });
+  const answeredOn = call.calleeDeviceId ?? null;
+  emitToUser(String(call.callerId), 'call:accepted', { callId: call.id, voice: callerVoice, deviceId: answeredOn });
+  emitToUser(String(call.calleeId), 'call:accepted', { callId: call.id, voice: calleeVoice, deviceId: answeredOn });
   return { callId: call.id as string, voice: calleeVoice };
 }
 
@@ -150,45 +156,57 @@ export async function getCallVoice(me: UserDoc, callId: string) {
   return voiceCredentials(call.channel, me.id, true);
 }
 
+/** Declines a ringing call. If it was already answered (a race), it hangs up instead. */
 export async function rejectCall(callee: UserDoc, callId: string) {
   const call = await Call.findOne({ _id: callId, calleeId: callee._id });
   if (!call) throw ApiError.notFound('Call not found.');
-  await finishCall(call.id, 'rejected', 'rejected', callee._id);
+  await endFor(call, callee._id);
 }
 
 /** Hang up an active call, or cancel/decline a ringing one. Safe to call twice. */
 export async function endCall(user: UserDoc, callId: string) {
   const call = await Call.findOne({ _id: callId, $or: [{ callerId: user._id }, { calleeId: user._id }] });
   if (!call) throw ApiError.notFound('Call not found.');
+  await endFor(call, user._id);
+}
 
-  if (call.status === 'ringing') {
-    const isCaller = call.callerId.equals(user._id);
-    await finishCall(call.id, isCaller ? 'cancelled' : 'rejected', isCaller ? 'cancelled' : 'rejected', user._id);
-  } else if (call.status === 'active') {
-    await finishCall(call.id, 'completed', 'hangup', user._id);
-  }
+/**
+ * Ends the call on behalf of one side. A ringing call is cancelled (caller) or declined (callee);
+ * if it was answered in the meantime, the second step hangs up the now-active call.
+ */
+async function endFor(call: CallDoc, userId: Types.ObjectId) {
+  const isCaller = call.callerId.equals(userId);
+  if (await finishCall(call.id, ['ringing'], isCaller ? 'cancelled' : 'rejected', isCaller ? 'cancelled' : 'rejected', userId)) return;
+  await finishCall(call.id, ['active'], 'completed', 'hangup', userId);
 }
 
 /** The receiver-facing reason: whoever didn't hang up sees "peer_hangup" */
 function reasonFor(userId: Types.ObjectId, reason: EndReason, endedBy: Types.ObjectId | null | undefined): CallEndReason {
-  if (reason === 'hangup' || reason === 'disconnected' || reason === 'server_restart') {
-    return endedBy && !endedBy.equals(userId) ? 'peer_hangup' : 'hangup';
-  }
+  const byPeer = Boolean(endedBy && !endedBy.equals(userId));
+  if (reason === 'disconnected') return byPeer ? 'peer_disconnected' : 'hangup';
+  if (reason === 'hangup' || reason === 'server_restart') return byPeer ? 'peer_hangup' : 'hangup';
   return reason;
 }
 
-/** Moves a ringing/active call to its final state exactly once and notifies both users. */
-async function finishCall(callId: string, status: FinalStatus, reason: EndReason, endedBy?: Types.ObjectId) {
+/**
+ * Moves the call to its final state exactly once and notifies both users. Only applies while the
+ * call is in one of the `from` states, so racing events can't overwrite each other (e.g. the ring
+ * timeout firing just as the listener answers can't mark an answered call as missed).
+ * Returns false if the call wasn't in one of those states.
+ */
+async function finishCall(callId: string, from: LiveStatus[], status: FinalStatus, reason: EndReason, endedBy?: Types.ObjectId) {
   const endedAt = new Date();
   const call = await Call.findOneAndUpdate(
-    { _id: callId, status: { $in: ['ringing', 'active'] } },
+    { _id: callId, status: { $in: from } },
     { status, endedAt, endReason: reason, endedBy: endedBy ?? null },
     { returnDocument: 'after' },
   );
-  if (!call) return; // already finished
+  if (!call) return false;
   clearTimers(call.id);
 
-  call.durationSec = call.answeredAt ? Math.round((endedAt.getTime() - call.answeredAt.getTime()) / 1000) : 0;
+  // Only a real conversation has a duration (not one cut off before the first minute was paid)
+  call.durationSec =
+    status === 'completed' && call.answeredAt ? Math.round((endedAt.getTime() - call.answeredAt.getTime()) / 1000) : 0;
   await Call.updateOne({ _id: call._id }, { durationSec: call.durationSec });
   await Promise.all([releaseUser(call.callerId, call._id), releaseUser(call.calleeId, call._id)]);
   if (status === 'completed') {
@@ -207,6 +225,7 @@ async function finishCall(callId: string, status: FinalStatus, reason: EndReason
       earnedPaise,
     });
   }
+  return true;
 }
 
 // ---------- Billing ----------
@@ -246,7 +265,8 @@ async function billMinute(callId: string, minute: number): Promise<boolean> {
   } catch (error) {
     if (error instanceof ApiError && error.code === 'INSUFFICIENT_BALANCE') {
       await Call.updateOne({ _id: call._id }, { $inc: { billedMinutes: -1 } });
-      await finishCall(call.id, 'completed', 'insufficient_balance');
+      // Out of coins before the first minute: the conversation never started
+      await finishCall(call.id, ['active'], minute === 1 ? 'cancelled' : 'completed', 'insufficient_balance');
       return false;
     }
     throw error;
@@ -305,6 +325,8 @@ export async function getActiveCall(me: UserDoc) {
     callId: call.id as string,
     status: call.status as 'ringing' | 'active',
     direction: outgoing ? ('outgoing' as const) : ('incoming' as const),
+    /** The device this side is using (null while an incoming call rings on all of them) */
+    deviceId: (outgoing ? call.callerDeviceId : call.calleeDeviceId) ?? null,
     peer: toPublicUser(peer),
     answeredAt: call.answeredAt?.toISOString() ?? null,
     voice: call.status === 'active' ? voiceCredentials(call.channel, me.id, true) : null,
@@ -363,11 +385,9 @@ export async function endCallsOfOfflineUser(userId: string) {
   const calls = await Call.find({ status: { $in: ['ringing', 'active'] }, $or: [{ callerId: userId }, { calleeId: userId }] });
   for (const call of calls) {
     const isCaller = String(call.callerId) === userId;
-    if (call.status === 'ringing') {
-      await finishCall(call.id, isCaller ? 'cancelled' : 'missed', isCaller ? 'cancelled' : 'no_answer');
-    } else {
-      await finishCall(call.id, 'completed', 'disconnected', isCaller ? call.callerId : call.calleeId);
-    }
+    const me = isCaller ? call.callerId : call.calleeId;
+    if (await finishCall(call.id, ['ringing'], isCaller ? 'cancelled' : 'missed', isCaller ? 'cancelled' : 'no_answer')) continue;
+    await finishCall(call.id, ['active'], 'completed', 'disconnected', me);
   }
 }
 

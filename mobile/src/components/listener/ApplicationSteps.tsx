@@ -14,7 +14,11 @@ import { VoiceRecorder } from './VoiceRecorder';
 const STEPS = [
   { key: 'details', title: 'Your details', subtitle: 'Only our team sees these. Your profile still shows your nickname and avatar.' },
   { key: 'about', title: 'About you', subtitle: 'Why would you be a good listener?' },
-  { key: 'voice', title: 'Voice intro', subtitle: `Record ${VOICE_INTRO_MIN_SEC}–${VOICE_INTRO_MAX_SEC} seconds introducing yourself.` },
+  {
+    key: 'voice',
+    title: 'Voice intro',
+    subtitle: `Record ${VOICE_INTRO_MIN_SEC}–${VOICE_INTRO_MAX_SEC} seconds introducing yourself. Once you’re approved, callers can play it on your profile.`,
+  },
   { key: 'review', title: 'Review & send', subtitle: 'Our team usually reviews applications within 24 hours.' },
 ] as const;
 

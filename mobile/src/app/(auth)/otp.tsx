@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Header, Screen, Text } from '@/components/ui';
 import { OTP_LENGTH, OTP_RESEND_SEC } from '@/constants/config';
 import { api } from '@/services';
+import { firebaseLoginEnabled, phoneAuth, phoneAuthErrorMessage } from '@/services/phoneAuth';
 import { useAuthStore } from '@/store/authStore';
 import { colors, fontSize, radius, spacing } from '@/theme';
-import { getErrorMessage } from '@/utils/errors';
 
 export default function OtpScreen() {
   const { phone = '', devOtp } = useLocalSearchParams<{ phone: string; devOtp?: string }>();
@@ -25,15 +25,47 @@ export default function OtpScreen() {
     return () => clearTimeout(id);
   }, [resendIn]);
 
+  const finishing = useRef(false);
+
+  /** Firebase proved the number: exchange its ID token for our session */
+  const finishWithFirebase = useCallback(
+    async (idToken: string) => {
+      if (finishing.current) return;
+      finishing.current = true;
+      setLoading(true);
+      setError(null);
+      try {
+        const { tokens, user } = await api.auth.loginWithFirebase(idToken);
+        phoneAuth.reset();
+        signIn(tokens, user);
+        router.replace('/');
+      } catch (e) {
+        finishing.current = false;
+        setError(phoneAuthErrorMessage(e));
+        setCode('');
+        setLoading(false);
+      }
+    },
+    [signIn],
+  );
+
+  // Android can read the SMS by itself and verify the number without the code being typed
+  useEffect(() => (firebaseLoginEnabled ? phoneAuth.onAutoVerified(finishWithFirebase) : undefined), [finishWithFirebase]);
+
   const verify = async (value: string) => {
+    if (finishing.current) return;
     setLoading(true);
     setError(null);
     try {
+      if (firebaseLoginEnabled) {
+        await finishWithFirebase(await phoneAuth.confirmCode(value));
+        return;
+      }
       const { tokens, user } = await api.auth.verifyOtp(phone, value);
       signIn(tokens, user);
       router.replace('/');
     } catch (e) {
-      setError(getErrorMessage(e));
+      setError(phoneAuthErrorMessage(e));
       setCode('');
       setLoading(false);
     }
@@ -48,10 +80,11 @@ export default function OtpScreen() {
   const resend = async () => {
     setError(null);
     try {
-      await api.auth.requestOtp(phone);
+      if (firebaseLoginEnabled) await phoneAuth.sendCode(phone);
+      else await api.auth.requestOtp(phone);
       setResendIn(OTP_RESEND_SEC);
     } catch (e) {
-      setError(getErrorMessage(e));
+      setError(phoneAuthErrorMessage(e));
     }
   };
 

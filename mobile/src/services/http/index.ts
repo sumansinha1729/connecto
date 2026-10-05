@@ -1,10 +1,13 @@
 /** Real backend implementation of the service contracts (server/ in this repo). */
 import type { Api } from '../contracts';
+import { getDeviceId } from '../device';
 import { session } from '../session';
 import type {
+  ActiveCall,
   AuthTokens,
   CallRecord,
   EarningsSummary,
+  ListenerProfile,
   Me,
   Room,
   RoomMessage,
@@ -16,23 +19,19 @@ import { http } from './client';
 import { socketConnection } from './socket';
 
 type WithFavorite = User & { isFavorite: boolean };
+type LoginResponse = AuthTokens & { user: Me; isNewUser: boolean };
+
+const toLogin = (data: LoginResponse) => ({
+  tokens: { accessToken: data.accessToken, refreshToken: data.refreshToken },
+  user: data.user,
+  isNewUser: data.isNewUser,
+});
 
 export const httpApi: Api = {
   auth: {
     requestOtp: (phone) => http.post('/auth/otp/request', { phone }, { auth: false }),
-
-    async verifyOtp(phone, code) {
-      const data = await http.post<AuthTokens & { user: Me; isNewUser: boolean }>(
-        '/auth/otp/verify',
-        { phone, code },
-        { auth: false },
-      );
-      return {
-        tokens: { accessToken: data.accessToken, refreshToken: data.refreshToken },
-        user: data.user,
-        isNewUser: data.isNewUser,
-      };
-    },
+    verifyOtp: async (phone, code) => toLogin(await http.post<LoginResponse>('/auth/otp/verify', { phone, code }, { auth: false })),
+    loginWithFirebase: async (idToken) => toLogin(await http.post<LoginResponse>('/auth/firebase', { idToken }, { auth: false })),
 
     async logout() {
       const refreshToken = session.getRefreshToken();
@@ -70,9 +69,9 @@ export const httpApi: Api = {
       ).users,
 
     async getProfile(userId) {
-      const { user } = await http.get<{ user: WithFavorite }>(`/users/${userId}`);
+      const { user, listenerProfile } = await http.get<{ user: WithFavorite; listenerProfile: ListenerProfile | null }>(`/users/${userId}`);
       const { isFavorite, ...rest } = user;
-      return { user: rest, isFavorite };
+      return { user: rest, isFavorite, listenerProfile };
     },
 
     listFavorites: async () => (await http.get<{ users: User[] }>('/users/me/favorites')).users,
@@ -97,8 +96,9 @@ export const httpApi: Api = {
   },
 
   calls: {
-    startCall: (userId) => http.post<{ callId: string }>('/calls', { userId }),
-    acceptCall: (callId) => http.post<{ voice: VoiceCredentials | null }>(`/calls/${callId}/accept`),
+    startCall: async (userId) => http.post<{ callId: string }>('/calls', { userId, deviceId: await getDeviceId() }),
+    acceptCall: async (callId) => http.post<{ voice: VoiceCredentials | null }>(`/calls/${callId}/accept`, { deviceId: await getDeviceId() }),
+    getActive: async () => (await http.get<{ call: ActiveCall | null }>('/calls/active')).call,
     rejectCall: (callId) => http.post(`/calls/${callId}/reject`),
     endCall: (callId) => http.post(`/calls/${callId}/end`),
     rateCall: (callId, stars) => http.post(`/calls/${callId}/rate`, { stars }),

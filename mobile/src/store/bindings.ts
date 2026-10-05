@@ -12,7 +12,9 @@ export function bindRealtimeToStores(): () => void {
     realtime.on('earnings:balance', ({ balancePaise }) => useEarningsStore.getState().setBalance(balancePaise)),
 
     realtime.on('call:incoming', ({ callId, from }) => useCallStore.getState().onIncoming(callId, from)),
-    realtime.on('call:accepted', ({ callId, voice }) => useCallStore.getState().onAccepted(callId, voice ?? null)),
+    realtime.on('call:accepted', ({ callId, voice, deviceId }) => useCallStore.getState().onAccepted(callId, voice ?? null, deviceId ?? null)),
+    // Events may have been missed while the connection was down
+    realtime.on('connection:open', () => useCallStore.getState().syncWithServer()),
     realtime.on('call:ended', ({ callId, reason, durationSec, coins, earnedPaise }) =>
       useCallStore.getState().onEnded(callId, reason, durationSec, coins, earnedPaise ?? 0),
     ),

@@ -20,6 +20,8 @@ export interface VoiceCredentials {
 export type CallEndReason =
   | 'hangup'
   | 'peer_hangup'
+  /** The other person's app lost its connection for too long */
+  | 'peer_disconnected'
   | 'rejected'
   | 'no_answer'
   | 'busy'
@@ -30,7 +32,8 @@ export interface ServerToClientEvents {
   /** Your own account changed (e.g. listener application approved) — refresh `GET /users/me` */
   'account:updated': (payload: { reason: 'listener_approved' | 'listener_rejected' | 'listener_revoked' }) => void;
   'call:incoming': (payload: { callId: string; from: PublicUser; expiresAt: string }) => void;
-  'call:accepted': (payload: { callId: string; voice: VoiceCredentials | null }) => void;
+  /** deviceId = the callee's device that answered; the callee's other devices step aside */
+  'call:accepted': (payload: { callId: string; voice: VoiceCredentials | null; deviceId: string | null }) => void;
   /** coins = what the caller spent; earnedPaise = what the listener earned */
   'call:ended': (payload: { callId: string; reason: CallEndReason; durationSec: number; coins: number; earnedPaise: number }) => void;
   'wallet:balance': (payload: { balance: number }) => void;

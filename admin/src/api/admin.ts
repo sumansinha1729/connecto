@@ -21,6 +21,8 @@ export interface LoginResult {
 
 export const adminApi = {
   // Login (admins only; the server never creates accounts here)
+  loginWithFirebase: (idToken: string) => http.post<LoginResult>('/auth/admin/firebase', { idToken }),
+  // Dev codes from the server (local testing only)
   requestCode: (phone: string) => http.post<{ expiresInSec: number; devOtp?: string }>('/auth/admin/otp/request', { phone }),
   verifyCode: (phone: string, code: string) => http.post<LoginResult>('/auth/admin/otp/verify', { phone, code }),
 

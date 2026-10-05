@@ -33,6 +33,25 @@ export const INTERESTS = [
   'Just chatting',
 ];
 
+/** Emoji shown next to each interest ("Can help with" on listener profiles) */
+export const INTEREST_EMOJI: Record<string, string> = {
+  Breakups: '💔',
+  Career: '💼',
+  Stress: '🌿',
+  Loneliness: '🫂',
+  Relationships: '💞',
+  Family: '🏡',
+  Movies: '🎬',
+  Music: '🎵',
+  Gaming: '🎮',
+  Travel: '✈️',
+  Cricket: '🏏',
+  Fitness: '💪',
+  Books: '📚',
+  Spirituality: '🕉️',
+  'Just chatting': '💬',
+};
+
 export const ROOM_TOPICS = [
   'Just chatting',
   'Breakups',

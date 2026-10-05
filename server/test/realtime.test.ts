@@ -186,7 +186,7 @@ test('call: listener disconnects mid-call', async () => {
   await call('POST', `/calls/${r.data.callId}/accept`, { token: B.token });
   B.socket!.disconnect();
   const end = await waitFor(A, 'call:ended', { since: t, timeout: 4000 });
-  check('call ends as "peer_hangup" after grace period', end?.reason === 'peer_hangup', end);
+  check('call ends as "peer_disconnected" after grace period', end?.reason === 'peer_disconnected', end);
   r = await call('GET', `/users/${B.id}`, { token: A.token });
   check('disconnected user marked offline', r.data.user.isOnline === false, r.data.user);
   await connect(B);
